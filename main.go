@@ -36,6 +36,8 @@ func main() {
 	flag.StringVar(&host, "host", host, "http server `host` name")
 	var cstaOutput bool
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
+	var color bool
+	flag.BoolVar(&color, "color", color, "color CSTA output")
 	var logFlags int = log.Lindent
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.Parse()
@@ -52,6 +54,9 @@ func main() {
 	if cstaOutput {
 		csta.SetLogOutput(os.Stdout)
 		csta.SetLogFlags(0)
+		if color {
+			csta.LogTTY = true
+		}
 	}
 
 	// инициализируем брокеров

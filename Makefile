@@ -5,9 +5,9 @@ VER     := $(or $(shell git describe --abbrev=0 --tags), "0.0")
 BUILD   := $(shell git rev-list --all --count)
 GIT     := $(shell git rev-parse --short HEAD)
 
-LTAG_COM := $(shell git rev-list --tags --max-count=1)
-LTAG     := $(shell git describe --tags $(LTAG_COM))
-REV      := $(shell git rev-list $(LTAG).. --count)
+LTAG_COM := $(or $(shell git rev-list --tags --max-count=1), "")
+LTAG     := $(or $(shell git describe --tags $(LTAG_COM)), "")
+REV      := $(or $(shell git rev-list $(LTAG).. --count), "0")
 
 FLAGS   := -ldflags "-X main.date=$(DATE) -X main.version=$(VER).$(REV) -X main.build=$(BUILD) -X main.git=$(GIT)"
 
@@ -30,7 +30,7 @@ build:
 	go build -race -o $(appname) $(FLAGS)
 
 debug: build
-	./$(appname) -host localhost:8000 -debug -csta > csta.log
+	./$(appname) -csta -color > csta.log
 
 clean:
 	rm -rf build/
