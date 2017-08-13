@@ -28,10 +28,11 @@ var (
 
 func main() {
 	var exts extList
-	exts.Set("3095,3099,3044")
+	// exts.Set("3095,3099,3044")
 	flag.Var(&exts, "ext", "comma-separated list of monitored `extensions`")
-	mxaddr, _ := csta.ParseURL("mx://d3test:981211@89.185.246.134?type=server")
-	flag.Var(mxaddr, "mx", "mx `address` with login and password")
+	var mxaddr = new(csta.Addr)
+	// mxaddr, _ = csta.ParseURL("mx://d3test:981211@89.185.246.134")
+	flag.Var(mxaddr, "mx", "mx url string in format `mx://login:password/host`")
 	var host = "localhost:8080"
 	flag.StringVar(&host, "host", host, "http server `host` name")
 	var cstaOutput bool
@@ -127,9 +128,11 @@ func main() {
 	}()
 
 	// устанавливаем соединение с MX
+	mxaddr.Type = "Server"
 	log.WithFields(log.Fields{
-		"host":  mxaddr.Hostname(),
-		"login": mxaddr.User.Username(),
+		"host":  mxaddr.Host,
+		"login": mxaddr.UserName,
+		"type":  mxaddr.Type,
 	}).Info("connecting to mx")
 	mx, err := mxaddr.Client()
 	if err != nil {

@@ -30,7 +30,7 @@ build:
 	go build -race -o $(appname) $(FLAGS)
 
 debug: build
-	./$(appname) -csta -color > csta.log
+	./$(appname) -mx mx://d3test:981211@89.185.246.134 -ext 3095,3099,3044 -csta -color > csta.log
 
 clean:
 	rm -rf build/
