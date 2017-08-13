@@ -8,30 +8,70 @@ html {
   background-attachment: fixed;
   background-size: cover;
 }
+body {
+  padding: 2em;
+}
+form {
+  width: 16em;
+  background: rgba(255, 255, 255, .75);
+  padding: 1.5em;
+  border: rgba(127, 127, 127, .75);
+  border-radius: .5em;
+  box-shadow: .1em .1em .3em rgba(0,0,0,0.2);
+}
+label {
+  display: block;
+}
+label span {
+  display: inline-block;
+  width: 5em;
+}
 </style>
+<form method="post" id="makecall">
+  <label><span>from:</span>
+  <input type="tel" name="from" required placeholder="from phone" autofocus/></label>
+  <label><span>to:</span>
+  <input type="tel" name="to" required placeholder="to phone"/></label>
+  <label><span>ring delay:</span>
+  <input type="number" name="ringDelay" value="1" min="0" max="60"/></label>
+  <label><span>vm delay:</span>
+  <input type="number" name="vmDelay" value="30" min="0" max="120" step="5" /></label>
+  <input type="submit" value="make call">
+</form>
 <script>
 var eventSource = new EventSource("/");
 
 eventSource.onopen = function(e) {
-  console.log("Соединение открыто");
+  console.log("connected");
 };
 
 eventSource.onerror = function(e) {
   if (this.readyState == EventSource.CONNECTING) {
-    console.log("Соединение прервалось, переподключаемся...");
+    console.log("reconnecting...");
   } else {
-    console.log("Ошибка, состояние: " + this.readyState);
+    console.log("connection error: " + this.readyState);
   }
 };
 
 eventSource.onmessage = function(e) {
-  console.log("Пришли данные: " + e.data);
+  console.log(e.data);
 };
 
 eventSource.addEventListener('DeliveredEvent', function(e) {
-  console.log("Звонок: " + e.data);
   var data = JSON.parse(e.data);
-  alert( 'Звонок с ' + data.callingDevice + ' на ' + data.calledDevice);
+  console.log(data);
+  alert( 'Call from ' + data.callingDevice + ' to ' + data.calledDevice);
 });
-
+</script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.form/4.2.2/jquery.form.min.js" integrity="sha384-FzT3vTVGXqf7wRfy8k4BiyzvbNfeYjK+frTVqZeNDFl8woCbF0CYG6g2fMEFFo/i" crossorigin="anonymous"></script>
+<script>
+  $(function() {
+    $('#makecall').ajaxForm({
+      dataType: "json",
+      success: function(data) {
+        console.log(data)
+        alert("Make call sended");
+      }});
+  });
 </script>

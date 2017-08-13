@@ -64,7 +64,6 @@ func main() {
 	for _, ext := range exts.List() {
 		brokers[ext] = sse.New()
 	}
-
 	// инициализируем сервис
 	var service = &Service{
 		mxaddr:  mxaddr.Host,
@@ -79,7 +78,8 @@ func main() {
 		},
 		Logger: log.WithField("type", "http"),
 	}
-	mux.Handle("GET", "/", service.CallMonitor)
+	mux.Handle("GET", "/", service.CallMonitor) // страница с мониторингом звонков
+	mux.Handle("POST", "/", service.MakeCall)   // сделать звонок
 	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
 	// инициализируем HTTP сервер
@@ -141,7 +141,7 @@ func main() {
 	log.WithFields(log.Fields{
 		"total": exts.Len(),
 		"exts":  exts.String(),
-	}).Info("starting users monitors")
+	}).Info("starting user monitors")
 	var monitors = mx.Monitor("DeliveredEvent")
 	for _, ext := range exts.List() {
 		// присоединяем к монитору данные о номере пользователя

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/xml"
 	"fmt"
 	"mime"
 	"net"
@@ -84,4 +85,108 @@ func (s *Service) CallMonitor(c *rest.Context) error {
 	ctxlog.WithField("count", broker.Connected()).
 		Debug("sse client disconnected")
 	return nil
+}
+
+// MakeCall выполняет звонок через сервер MX.
+func (s *Service) MakeCall(c *rest.Context) error {
+	// проверяем авторизацию пользователя
+	login, password, ok := c.BasicAuth()
+	if !ok {
+		// TODO: адрес MX
+		c.SetHeader("WWW-Authenticate", fmt.Sprintf("Basic realm=%s", appName))
+		return rest.ErrUnauthorized
+	}
+	c.AddLogField("login", login)
+
+	// разбираем параметры из запроса
+	type Params struct {
+		RingDelay uint8  `xml:"ringdelay,attr" json:"ringDelay" form:"ringDelay"`
+		VMDelay   uint8  `xml:"vmdelay,attr" json:"vmDelay" form:"vmDelay"`
+		From      string `xml:"address" json:"from" form:"from"`
+		To        string `xml:"-" json:"to" form:"to"`
+	}
+	// инициализируем параметры по умолчанию и разбираем запрос
+	var params = &Params{
+		RingDelay: 1,
+		VMDelay:   30,
+	}
+	if err := c.Bind(params); err != nil {
+		return err
+	}
+
+	// устанавливаем соединие с MX и проверяем логин и пароль пользователя
+	client, err := csta.NewClient(s.mxaddr, csta.Login{
+		UserName: login,
+		Password: password,
+		Type:     "User",
+		Platform: "iPhone",
+		Version:  "1.0",
+	})
+	if err != nil {
+		if errLogin, ok := err.(*csta.LoginError); ok {
+			err = c.Error(http.StatusForbidden, errLogin.Error())
+		} else if errNetwork, ok := err.(net.Error); ok && errNetwork.Timeout() {
+			err = c.Error(http.StatusGatewayTimeout, errNetwork.Error())
+		} else {
+			err = c.Error(http.StatusServiceUnavailable, err.Error())
+		}
+		return err
+	}
+	// добавляем информацию в кеш в случае успешной авторизации
+	s.cache.Add(login, password, client.Ext)
+	defer client.Close()
+
+	// отправляем команду на установку номера исходящего звонка
+	if _, err = client.Send(&struct {
+		XMLName xml.Name `xml:"iq"`
+		Type    string   `xml:"type,attr"`
+		ID      string   `xml:"id,attr"`
+		Mode    string   `xml:"mode,attr"`
+		*Params
+	}{
+		Type:   "set",
+		ID:     "mode",
+		Mode:   "remote",
+		Params: params,
+	}); err != nil {
+		return err
+	}
+
+	// инициируем звонок на номер
+	type callingDevice struct {
+		Type string `xml:"typeOfNumber,attr"`
+		Ext  string `xml:",chardata"`
+	}
+	var cmd = &struct {
+		XMLName       xml.Name      `xml:"MakeCall"`
+		CallingDevice callingDevice `xml:"callingDevice"`
+		To            string        `xml:"calledDirectoryNumber"`
+	}{
+		CallingDevice: callingDevice{
+			Type: "deviceID",
+			Ext:  client.Ext,
+		},
+		To: params.To,
+	}
+	resp, err := client.SendWithResponse(cmd, csta.ReadTimeout)
+	if err != nil {
+		return err
+	}
+	// разбираем ответ
+	var result = new(struct {
+		CallID       uint64 `xml:"callingDevice>callID" json:"callId"`
+		DeviceID     string `xml:"callingDevice>deviceID" json:"deviceId"`
+		CalledDevice string `xml:"calledDevice" json:"called"`
+	})
+	if err := resp.Decode(result); err != nil {
+		return err
+	}
+	log.WithFields(log.Fields{
+		"mx":   client.SN,
+		"ext":  client.Ext,
+		"from": params.From,
+		"to":   params.To,
+	}).Debug("make call")
+	return c.Write(result)
+
 }
