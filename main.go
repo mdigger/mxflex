@@ -177,6 +177,10 @@ func main() {
 				log.WithError(err).Error("bad delivery event")
 				continue
 			}
+			// игнорируем, если не указано вызываемое устройство
+			if delivered.CalledDevice == "" {
+				continue
+			}
 			data, err := json.Marshal(delivered)
 			if err != nil {
 				log.WithError(err).Error("bad delivery json format")
