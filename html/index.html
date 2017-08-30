@@ -12,30 +12,16 @@ body {
   padding: 2em;
 }
 form {
-  width: 16em;
+  display: inline-block;
   background: rgba(255, 255, 255, .75);
   padding: 1.5em;
   border: rgba(127, 127, 127, .75);
   border-radius: .5em;
   box-shadow: .1em .1em .3em rgba(0,0,0,0.2);
 }
-label {
-  display: block;
-}
-label span {
-  display: inline-block;
-  width: 5em;
-}
 </style>
 <form method="post" id="makecall">
-  <label><span>from:</span>
-  <input type="tel" name="from" required placeholder="from phone" autofocus/></label>
-  <label><span>to:</span>
-  <input type="tel" name="to" required placeholder="to phone"/></label>
-  <label><span>ring delay:</span>
-  <input type="number" name="ringDelay" value="1" min="0" max="60"/></label>
-  <label><span>vm delay:</span>
-  <input type="number" name="vmDelay" value="30" min="0" max="120" step="5" /></label>
+  <input type="tel" name="to" required placeholder="to phone"/>
   <input type="submit" value="make call">
 </form>
 <script>

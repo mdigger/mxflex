@@ -13,6 +13,7 @@ import (
 	"github.com/mdigger/sse"
 )
 
+// Service описывает сервис по мониторингу звонков.
 type Service struct {
 	mxaddr  string
 	cache   MXAuthCache
@@ -63,7 +64,7 @@ func (s *Service) CallMonitor(c *rest.Context) error {
 	// запрашиваем брокера SSE для данного номера пользователя
 	var broker = s.brokers[ext]
 	if broker == nil {
-		return rest.ErrForbidden
+		return c.Error(http.StatusForbidden, "phone number is not monitored")
 	}
 	// разбираем заголовок запроса, чтобы понять что отдавть
 	mediatype, _, _ := mime.ParseMediaType(c.Header("Accept"))
@@ -99,17 +100,9 @@ func (s *Service) MakeCall(c *rest.Context) error {
 	c.AddLogField("login", login)
 
 	// разбираем параметры из запроса
-	type Params struct {
-		RingDelay uint8  `xml:"ringdelay,attr" json:"ringDelay" form:"ringDelay"`
-		VMDelay   uint8  `xml:"vmdelay,attr" json:"vmDelay" form:"vmDelay"`
-		From      string `xml:"address" json:"from" form:"from"`
-		To        string `xml:"-" json:"to" form:"to"`
-	}
-	// инициализируем параметры по умолчанию и разбираем запрос
-	var params = &Params{
-		RingDelay: 1,
-		VMDelay:   30,
-	}
+	var params = new(struct {
+		To string `json:"to" form:"to"`
+	})
 	if err := c.Bind(params); err != nil {
 		return err
 	}
@@ -136,19 +129,14 @@ func (s *Service) MakeCall(c *rest.Context) error {
 	s.cache.Add(login, password, client.Ext)
 	defer client.Close()
 
-	// отправляем команду на установку номера исходящего звонка
-	if _, err = client.Send(&struct {
-		XMLName xml.Name `xml:"iq"`
-		Type    string   `xml:"type,attr"`
-		ID      string   `xml:"id,attr"`
-		Mode    string   `xml:"mode,attr"`
-		*Params
+	// запускаем монитор
+	_, err = client.SendWithResponse(&struct {
+		XMLName xml.Name `xml:"MonitorStart"`
+		Ext     string   `xml:"monitorObject>deviceObject"`
 	}{
-		Type:   "set",
-		ID:     "mode",
-		Mode:   "remote",
-		Params: params,
-	}); err != nil {
+		Ext: client.Ext,
+	}, csta.ReadTimeout)
+	if err != nil {
 		return err
 	}
 
@@ -182,11 +170,9 @@ func (s *Service) MakeCall(c *rest.Context) error {
 		return err
 	}
 	log.WithFields(log.Fields{
-		"mx":   client.SN,
-		"ext":  client.Ext,
-		"from": params.From,
-		"to":   params.To,
+		"mx":  client.SN,
+		"ext": client.Ext,
+		"to":  params.To,
 	}).Debug("make call")
 	return c.Write(result)
-
 }

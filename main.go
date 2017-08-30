@@ -20,8 +20,8 @@ import (
 
 var (
 	appName = "mxflex"     // название сервиса
-	version = "0.3"        // версия
-	date    = "2017-08-13" // дата сборки
+	version = "0.4"        // версия
+	date    = "2017-08-30" // дата сборки
 	git     = ""           // версия git
 	build   = ""
 )
@@ -39,7 +39,7 @@ func main() {
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
 	var color bool
 	flag.BoolVar(&color, "color", color, "color CSTA output")
-	var logFlags int = log.Lindent
+	var logFlags = log.LstdFlags | log.Lindent
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.Parse()
 
@@ -61,6 +61,10 @@ func main() {
 	}
 
 	// инициализируем брокеров
+	if exts.Len() == 0 {
+		log.Error("no monitoring exts")
+		os.Exit(2)
+	}
 	var brokers = make(map[string]*sse.Broker, exts.Len())
 	for _, ext := range exts.List() {
 		brokers[ext] = sse.New()
@@ -197,7 +201,7 @@ func main() {
 	}
 }
 
-// Delivery описывает структуру события входящего звонка
+// MXDelivery описывает структуру события входящего звонка
 type MXDelivery struct {
 	MonitorCrossRefID     uint64 `xml:"monitorCrossRefID" json:"-"`
 	CallID                uint64 `xml:"connection>callID" json:"callId"`
