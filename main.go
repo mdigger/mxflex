@@ -20,10 +20,12 @@ import (
 
 var (
 	appName = "mxflex"     // название сервиса
-	version = "0.4"        // версия
-	date    = "2017-08-30" // дата сборки
+	version = "0.5"        // версия
+	date    = "2017-08-31" // дата сборки
 	git     = ""           // версия git
 	build   = ""
+
+	phone string
 )
 
 func main() {
@@ -35,6 +37,7 @@ func main() {
 	flag.Var(mxaddr, "mx", "mx url string in format `mx://login:password/host`")
 	var host = "localhost:8080"
 	flag.StringVar(&host, "host", host, "http server `host` name")
+	flag.StringVar(&phone, "phone", phone, "outgoing phone `number`")
 	var cstaOutput bool
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
 	var color bool
@@ -63,6 +66,14 @@ func main() {
 	// инициализируем брокеров
 	if exts.Len() == 0 {
 		log.Error("no monitoring exts")
+		os.Exit(2)
+	}
+	if phone == "" {
+		log.Error("no outgoing phone number")
+		os.Exit(2)
+	}
+	if mxaddr == nil {
+		log.Error("no mx address")
 		os.Exit(2)
 	}
 	var brokers = make(map[string]*sse.Broker, exts.Len())
@@ -166,11 +177,13 @@ func main() {
 		// проверяем, что данное событие относится к мониторингу
 		ext, ok := event.Data.(string)
 		if !ok {
+			log.Debug("no ext")
 			continue
 		}
 		// проверяем, что брокер для пользователя поддерживается
 		broker, ok := brokers[ext]
 		if !ok {
+			log.Debug("not monitored")
 			continue
 		}
 		// преобразуем данные и отправляем брокеру
@@ -183,6 +196,7 @@ func main() {
 			}
 			// игнорируем, если не указано вызываемое устройство
 			if delivered.CalledDevice == "" {
+				log.Warning("ignore empty delivery")
 				continue
 			}
 			data, err := json.Marshal(delivered)

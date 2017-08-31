@@ -139,6 +139,26 @@ func (s *Service) MakeCall(c *rest.Context) error {
 	if err != nil {
 		return err
 	}
+	// <iq vmdelay="30" ringdelay="1" mode="remote" type="set" id="mode"><address>+420720961083</address></iq>
+	_, err = client.Send(&struct {
+		XMLName   xml.Name `xml:"iq"`
+		Type      string   `xml:"type,attr"`
+		ID        string   `xml:"id,attr"`
+		Mode      string   `xml:"mode,attr"`
+		RingDelay uint16   `xml:"ringdelay,attr"`
+		VMDelay   uint16   `xml:"vmdelay,attr"`
+		From      string   `xml:"address"`
+	}{
+		Type:      "set",
+		ID:        "mode",
+		Mode:      "remote",
+		RingDelay: 1,
+		VMDelay:   30,
+		From:      phone,
+	})
+	if err != nil {
+		return err
+	}
 
 	// инициируем звонок на номер
 	type callingDevice struct {
