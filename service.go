@@ -112,7 +112,7 @@ func (s *Service) MakeCall(c *rest.Context) error {
 		UserName: login,
 		Password: password,
 		Type:     "User",
-		Platform: "iPhone",
+		Platform: "CRM",
 		Version:  "1.0",
 	})
 	if err != nil {
