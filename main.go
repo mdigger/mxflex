@@ -49,11 +49,10 @@ func main() {
 
 	log.SetFlags(logFlags)
 	log.WithFields(log.Fields{
-		"name":     appName,
-		"version":  version,
-		"build":    date,
-		"revision": build,
-		"git":      git,
+		"name":    appName,
+		"version": version,
+		"build":   date,
+		"git":     git,
 	}).Info("starting service")
 	log.SetLevel(log.DebugLevel)
 	if cstaOutput {
