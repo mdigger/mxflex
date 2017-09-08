@@ -1,29 +1,30 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/acme/autocert"
-
 	"github.com/mdigger/csta"
 	"github.com/mdigger/log"
 	"github.com/mdigger/rest"
 	"github.com/mdigger/sse"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
 	appName = "mxflex"     // название сервиса
-	version = "0.5"        // версия
-	date    = "2017-08-31" // дата сборки
+	version = "0.6"        // версия
+	date    = "2017-09-08" // дата сборки
 	git     = ""           // версия git
-	build   = ""
 
 	phone string
 )
@@ -99,46 +100,63 @@ func main() {
 	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
 	// инициализируем HTTP сервер
-	server := &http.Server{
+	var server = &http.Server{
 		Addr:         host,
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
 	}
+	// анализируем порт
+	var httphost, port, err = net.SplitHostPort(host)
+	if err, ok := err.(*net.AddrError); ok && err.Err == "missing port in address" {
+		httphost = err.Addr
+	}
+	var isIP = (net.ParseIP(httphost) != nil)
+	var notLocal = (httphost != "localhost" &&
+		!strings.HasSuffix(httphost, ".local") &&
+		!isIP)
+	var canCert = notLocal && httphost != "" &&
+		(port == "443" || port == "https" || port == "")
+
 	// добавляем автоматическую поддержку TLS сертификатов для сервиса
-	if !strings.HasPrefix(host, "localhost") &&
-		!strings.HasPrefix(host, "127.0.0.1") {
+	if canCert {
 		manager := autocert.Manager{
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(host),
-			Email:      "dmitrys@xyzrd.com",
-			Cache:      autocert.DirCache("letsEncript.cache"),
+			Prompt: autocert.AcceptTOS,
+			HostPolicy: func(_ context.Context, host string) error {
+				if host != httphost {
+					log.WithField("host", host).Error("unsupported https host")
+					return errors.New("acme/autocert: host not configured")
+				}
+				return nil
+			},
+			Email: "dmitrys@xyzrd.com",
+			Cache: autocert.DirCache("letsEncript.cache"),
 		}
 		server.TLSConfig = &tls.Config{
 			GetCertificate: manager.GetCertificate,
 		}
 		server.Addr = ":https"
+	} else if port == "" {
+		server.Addr = net.JoinHostPort(httphost, "http")
+	} else {
+		server.Addr = net.JoinHostPort(httphost, port)
 	}
 	// запускаем HTTP сервер
 	go func() {
-		var secure = (server.Addr == ":https" || server.Addr == ":443")
-		slog := log.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"address": server.Addr,
-			"https":   secure,
-		})
-		if server.Addr != host {
-			slog = slog.WithField("host", host)
-		}
-		slog.Info("starting http server")
+			"tls":     canCert,
+			"host":    httphost,
+		}).Info("starting http server")
 		var err error
-		if secure {
+		if canCert {
 			err = server.ListenAndServeTLS("", "")
 		} else {
 			err = server.ListenAndServe()
 		}
 		if err != nil {
 			log.WithError(err).Error("http server stoped")
-			os.Exit(3)
+			os.Exit(2)
 		}
 	}()
 

@@ -1,15 +1,10 @@
-appname := mxflex
+appname  ?= mxflex
 
-DATE    := $(shell date -u +%Y-%m-%d)
-VER     := $(or $(shell git describe --abbrev=0 --tags), "0.0")
-BUILD   := $(shell git rev-list --all --count)
-GIT     := $(shell git rev-parse --short HEAD)
+DATE     ?= $(shell date -u +%F)
+VERSION  ?= $(shell git describe --tag --long --always --dirty 2>/dev/null)
+GIT      ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 
-LTAG_COM := $(or $(shell git rev-list --tags --max-count=1), "")
-LTAG     := $(or $(shell git describe --tags $(LTAG_COM)), "")
-REV      := $(or $(shell git rev-list $(LTAG).. --count), "0")
-
-FLAGS   := -ldflags "-X main.date=$(DATE) -X main.version=$(VER).$(REV) -X main.build=$(BUILD) -X main.git=$(GIT)"
+FLAGS   := -ldflags "-X main.git=$(GIT) -X main.date=$(DATE)"
 
 build = GOOS=$(1) GOARCH=$(2) go build -o build/$(appname)$(3) $(FLAGS)
 tar = cd ./build && tar -czf $(1)_$(2).tar.gz $(appname)$(3) && rm $(appname)$(3)
@@ -18,13 +13,16 @@ zip = cd ./build && zip $(1)_$(2).zip $(appname)$(3) && rm $(appname)$(3)
 .PHONY: all windows darwin linux clean build
 
 info:
-	@echo "---------------------"
-	@echo "Date:       $(DATE)"
-	@echo "Version:    $(VER)"
-	@echo "Revision:   $(REV)"
-	@echo "Build:      $(BUILD)"
-	@echo "GIT:        $(GIT)"
-	@echo "---------------------"
+	@echo "────────────────────────────────"
+	@echo "Go:       $(subst go version ,,$(shell go version))"
+	@echo "Date:     $(DATE)"
+	@echo "Git:      $(GIT)"
+	@echo "Version:  $(VERSION)"
+	@echo "────────────────────────────────"
+
+package: info clean darwin linux
+	cp -R ./html ./build
+	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
 build:
 	go build -race -o $(appname) $(FLAGS)
