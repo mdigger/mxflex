@@ -33,13 +33,11 @@ var (
 )
 
 func main() {
-	var host = "localhost:8080"
-	flag.StringVar(&host, "host", host, "http server `host` name")
 	var configName = appName + ".json"
 	flag.StringVar(&configName, "config", configName, "config `filename`")
 	var cstaOutput bool
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
-	var logFlags = log.LstdFlags | log.Lindent
+	var logFlags = log.LstdFlags //| log.Lindent
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.Parse()
 
@@ -57,7 +55,8 @@ func main() {
 	}
 
 	var config = new(struct {
-		MX struct {
+		Host string `json:"host"`
+		MX   struct {
 			Addr     string `json:"addr"`
 			Login    string `json:"login"`
 			Password string `json:"password"`
@@ -75,6 +74,9 @@ func main() {
 		os.Exit(2)
 	}
 
+	if config.Host == "" {
+		config.Host = "localhost:8000"
+	}
 	// инициализируем брокеров
 	if len(config.Exts) == 0 {
 		log.Error("no monitoring exts")
@@ -113,13 +115,13 @@ func main() {
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
 	// инициализируем HTTP сервер
 	var server = &http.Server{
-		Addr:         host,
+		Addr:         config.Host,
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
 	}
 	// анализируем порт
-	httphost, port, err := net.SplitHostPort(host)
+	httphost, port, err := net.SplitHostPort(config.Host)
 	if err, ok := err.(*net.AddrError); ok && err.Err == "missing port in address" {
 		httphost = err.Addr
 	}
@@ -135,8 +137,8 @@ func main() {
 		manager := autocert.Manager{
 			Prompt: autocert.AcceptTOS,
 			HostPolicy: func(_ context.Context, host string) error {
-				if host != httphost {
-					log.WithField("host", host).Error("unsupported https host")
+				if config.Host != httphost {
+					log.WithField("host", config.Host).Error("unsupported https host")
 					return errors.New("acme/autocert: host not configured")
 				}
 				return nil
@@ -167,7 +169,7 @@ func main() {
 			err = server.ListenAndServe()
 		}
 		if err != nil {
-			log.WithError(err).Error("http server stoped")
+			log.WithError(err).Error("http server stopped")
 			os.Exit(2)
 		}
 	}()

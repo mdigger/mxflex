@@ -1,4 +1,5 @@
 {
+    "host": "localhost:8080",
     "mx": {
         "addr": "89.185.246.134:7778",
         "login": "d3test",

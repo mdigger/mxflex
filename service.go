@@ -36,7 +36,7 @@ func (s *Service) CallMonitor(c *rest.Context) error {
 	c.AddLogField("login", login)
 	// запрашиваем кеш на получение внутреннего номера пользователя
 	var ext = s.cache.Check(login, password)
-	// если информации нет в кеше, то необходимо авторизовать пользователя
+	// если информации нет в кеш, то необходимо авторизовать пользователя
 	if ext == "" {
 		// устанавливаем соединение с MX и проверяем логин и пароль пользователя
 		client, err := csta.NewClient(s.mxaddr, csta.Login{
@@ -67,7 +67,7 @@ func (s *Service) CallMonitor(c *rest.Context) error {
 	if broker == nil {
 		return c.Error(http.StatusForbidden, "phone number is not monitored")
 	}
-	// разбираем заголовок запроса, чтобы понять что отдавть
+	// разбираем заголовок запроса, чтобы понять что отдавать
 	mediatype, _, _ := mime.ParseMediaType(c.Header("Accept"))
 	if mediatype != sse.Mimetype {
 		// отдаем файл с HTML
