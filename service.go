@@ -18,6 +18,7 @@ type Service struct {
 	mxaddr  string
 	cache   MXAuthCache
 	brokers map[string]*sse.Broker
+	phone   string
 }
 
 var htmlFile = "./html/index.html"
@@ -37,7 +38,7 @@ func (s *Service) CallMonitor(c *rest.Context) error {
 	var ext = s.cache.Check(login, password)
 	// если информации нет в кеше, то необходимо авторизовать пользователя
 	if ext == "" {
-		// устанавливаем соединие с MX и проверяем логин и пароль пользователя
+		// устанавливаем соединение с MX и проверяем логин и пароль пользователя
 		client, err := csta.NewClient(s.mxaddr, csta.Login{
 			UserName: login,
 			Password: password,
@@ -107,7 +108,7 @@ func (s *Service) MakeCall(c *rest.Context) error {
 		return err
 	}
 
-	// устанавливаем соединие с MX и проверяем логин и пароль пользователя
+	// устанавливаем соединение с MX и проверяем логин и пароль пользователя
 	client, err := csta.NewClient(s.mxaddr, csta.Login{
 		UserName: login,
 		Password: password,
@@ -154,7 +155,7 @@ func (s *Service) MakeCall(c *rest.Context) error {
 		Mode:      "remote",
 		RingDelay: 1,
 		VMDelay:   30,
-		From:      phone,
+		From:      s.phone,
 	})
 	if err != nil {
 		return err

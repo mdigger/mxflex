@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/mdigger/csta"
 	"github.com/mdigger/log"
@@ -22,27 +25,20 @@ import (
 
 var (
 	appName = "mxflex"     // название сервиса
-	version = "0.6"        // версия
-	date    = "2017-09-08" // дата сборки
+	version = "0.7"        // версия
+	date    = "2017-09-11" // дата сборки
 	git     = ""           // версия git
 
 	phone string
 )
 
 func main() {
-	var exts extList
-	// exts.Set("3095,3099,3044")
-	flag.Var(&exts, "ext", "comma-separated list of monitored `extensions`")
-	var mxaddr = new(csta.Addr)
-	// mxaddr, _ = csta.ParseURL("mx://d3test:981211@89.185.246.134")
-	flag.Var(mxaddr, "mx", "mx url string in format `mx://login:password/host`")
 	var host = "localhost:8080"
 	flag.StringVar(&host, "host", host, "http server `host` name")
-	flag.StringVar(&phone, "phone", phone, "outgoing phone `number`")
+	var configName = appName + ".json"
+	flag.StringVar(&configName, "config", configName, "config `filename`")
 	var cstaOutput bool
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
-	var color bool
-	flag.BoolVar(&color, "color", color, "color CSTA output")
 	var logFlags = log.LstdFlags | log.Lindent
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.Parse()
@@ -58,32 +54,49 @@ func main() {
 	if cstaOutput {
 		csta.SetLogOutput(os.Stdout)
 		csta.SetLogFlags(0)
-		if color {
-			csta.LogTTY = true
-		}
+	}
+
+	var config = new(struct {
+		MX struct {
+			Addr     string `json:"addr"`
+			Login    string `json:"login"`
+			Password string `json:"password"`
+		} `json:"mx"`
+		Phone string   `json:"phone"`
+		Exts  []string `json:"exts"`
+	})
+	data, err := ioutil.ReadFile(configName)
+	if err != nil {
+		log.WithError(err).Error("config file error")
+		os.Exit(2)
+	}
+	if err = yaml.Unmarshal(data, config); err != nil {
+		log.WithError(err).Error("config error")
+		os.Exit(2)
 	}
 
 	// инициализируем брокеров
-	if exts.Len() == 0 {
+	if len(config.Exts) == 0 {
 		log.Error("no monitoring exts")
 		os.Exit(2)
 	}
-	if phone == "" {
+	if config.Phone == "" {
 		log.Error("no outgoing phone number")
 		os.Exit(2)
 	}
-	if mxaddr == nil {
+	if config.MX.Addr == "" {
 		log.Error("no mx address")
 		os.Exit(2)
 	}
-	var brokers = make(map[string]*sse.Broker, exts.Len())
-	for _, ext := range exts.List() {
+	var brokers = make(map[string]*sse.Broker, len(config.Exts))
+	for _, ext := range config.Exts {
 		brokers[ext] = sse.New()
 	}
 	// инициализируем сервис
 	var service = &Service{
-		mxaddr:  mxaddr.Host,
+		mxaddr:  config.MX.Addr,
 		brokers: brokers,
+		phone:   config.Phone,
 	}
 	// инициализируем обработку HTTP запросов
 	var mux = &rest.ServeMux{
@@ -106,7 +119,7 @@ func main() {
 		WriteTimeout: time.Minute * 5,
 	}
 	// анализируем порт
-	var httphost, port, err = net.SplitHostPort(host)
+	httphost, port, err := net.SplitHostPort(host)
 	if err, ok := err.(*net.AddrError); ok && err.Err == "missing port in address" {
 		httphost = err.Addr
 	}
@@ -129,7 +142,7 @@ func main() {
 				return nil
 			},
 			Email: "dmitrys@xyzrd.com",
-			Cache: autocert.DirCache("letsEncript.cache"),
+			Cache: autocert.DirCache("letsEncrypt.cache"),
 		}
 		server.TLSConfig = &tls.Config{
 			GetCertificate: manager.GetCertificate,
@@ -160,13 +173,18 @@ func main() {
 	}()
 
 	// устанавливаем соединение с MX
-	mxaddr.Type = "Server"
 	log.WithFields(log.Fields{
-		"host":  mxaddr.Host,
-		"login": mxaddr.UserName,
-		"type":  mxaddr.Type,
+		"host":  config.MX.Addr,
+		"login": config.MX.Login,
+		"type":  "Server",
 	}).Info("connecting to mx")
-	mx, err := mxaddr.Client()
+	mx, err := csta.NewClient(config.MX.Addr, csta.Login{
+		UserName: config.MX.Login,
+		Password: config.MX.Password,
+		Type:     "Server",
+		Platform: "iPhone",
+		Version:  "1.0",
+	})
 	if err != nil {
 		log.WithError(err).Error("mx connection error")
 		return
@@ -174,11 +192,11 @@ func main() {
 	defer mx.Close()
 
 	log.WithFields(log.Fields{
-		"total": exts.Len(),
-		"exts":  exts.String(),
+		"total": len(config.Exts),
+		"exts":  strings.Join(config.Exts, ","),
 	}).Info("starting user monitors")
 	var monitors = mx.Monitor("DeliveredEvent")
-	for _, ext := range exts.List() {
+	for _, ext := range config.Exts {
 		// присоединяем к монитору данные о номере пользователя
 		if err = monitors.Start(ext, ext); err != nil {
 			break

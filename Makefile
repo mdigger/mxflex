@@ -22,6 +22,7 @@ info:
 
 package: info clean darwin linux
 	cp -R ./html ./build
+	cp mxflex.json ./build
 	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
 build:
