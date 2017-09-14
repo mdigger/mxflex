@@ -61,6 +61,7 @@ func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 	for _, contact := range contacts {
 		monitor.ab.Store(contact.JID, contact)
 	}
+	go monitor.monitoring() // запускаем мониторинг звонков
 	return monitor, nil
 }
 
@@ -206,8 +207,8 @@ type MakeCallResponse struct {
 	CalledDevice string `xml:"calledDevice" json:"called"`
 }
 
-// Monitoring запускает процесс мониторинга звонков.
-func (m *MXServer) Monitoring() error {
+// monitoring запускает процесс мониторинга звонков.
+func (m *MXServer) monitoring() error {
 	// запускаем мониторинг изменений в адресной книге
 	if _, err := m.conn.SendWithResponse("<MonitorStartAb/>"); err != nil {
 		return err

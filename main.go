@@ -87,7 +87,6 @@ func main() {
 		os.Exit(2)
 	}
 	defer monitor.Close()
-	go monitor.Monitoring() // запускаем мониторинг звонков
 
 	// инициализируем обработку HTTP запросов
 	var mux = &rest.ServeMux{
