@@ -5,6 +5,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -230,4 +231,59 @@ func (h *HTTPHandler) Contacts(c *rest.Context) error {
 		return err
 	}
 	return c.Write(rest.JSON{"contacts": h.mx().Contacts()})
+}
+
+// CallHold подвешивает звонок.
+func (h *HTTPHandler) CallHold(c *rest.Context) error {
+	if _, err := h.tokenExt(c); err != nil {
+		return err
+	}
+	callID, err := strconv.ParseUint(c.Form("callId"), 10, 64)
+	if err != nil {
+		return c.Error(http.StatusBadRequest, "bad call id")
+	}
+	c.AddLogField("callId", callID)
+	var deviceID = c.Form("deviceId")
+	if deviceID == "" {
+		return c.Error(http.StatusBadRequest, "device id required")
+	}
+	return h.mx().CallHold(callID, deviceID)
+}
+
+// CallHangup сбрасывает звонок.
+func (h *HTTPHandler) CallHangup(c *rest.Context) error {
+	if _, err := h.tokenExt(c); err != nil {
+		return err
+	}
+	callID, err := strconv.ParseUint(c.Form("callId"), 10, 64)
+	if err != nil {
+		return c.Error(http.StatusBadRequest, "bad call id")
+	}
+	c.AddLogField("callId", callID)
+	var deviceID = c.Form("deviceId")
+	if deviceID == "" {
+		return c.Error(http.StatusBadRequest, "device id required")
+	}
+	return h.mx().CallHangup(callID, deviceID)
+}
+
+// CallTransfer перебрасывает звонок.
+func (h *HTTPHandler) CallTransfer(c *rest.Context) error {
+	if _, err := h.tokenExt(c); err != nil {
+		return err
+	}
+	callID, err := strconv.ParseUint(c.Form("callId"), 10, 64)
+	if err != nil {
+		return c.Error(http.StatusBadRequest, "bad call id")
+	}
+	c.AddLogField("callId", callID)
+	var deviceID = c.Form("deviceId")
+	if deviceID == "" {
+		return c.Error(http.StatusBadRequest, "device id required")
+	}
+	var destination = c.Form("destination")
+	if destination == "" {
+		return c.Error(http.StatusBadRequest, "destination phone required")
+	}
+	return h.mx().CallTransfer(callID, deviceID, destination)
 }

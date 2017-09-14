@@ -347,15 +347,63 @@ Content-Length: 107
 
 ## Call Hold
 
-_Not implemented yet._
+```http
+POST /api/call/hold HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MDU0MzQ5NjIsImV4dCI6IjMwOTUiLCJpYXQiOjE1MDU0MzEzNTIsIm14IjoiNjMwMjIiLCJzdWIiOjQzODg0ODUxMTQ3NDA2MTQ1fQ.EtgCdPAoyCr3e8S_IPOkN3y09Q5AJ2mBsPaqcxbsD3c
+Content-Type: application/x-www-form-urlencoded; charset=utf-8
+Host: localhost:8080
+Content-Length: 23
+
+callId=43&deviceId=3095
+```
+
+В качестве параметров запроса передаются идентификатор звонка и устройства:
+
+- `callId`
+- `deviceId`
+
+В случае успешного действия ответ не возвращается: нужно следить за событиями -- ответ будет там.
+
+Повторный вызов функции должен снять звонок с ожидания.
 
 ## Call Transfer
 
-_Not implemented yet._
+```http
+POST /api/call/transfer HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MDU0MzQ5NjIsImV4dCI6IjMwOTUiLCJpYXQiOjE1MDU0MzEzNTIsIm14IjoiNjMwMjIiLCJzdWIiOjQzODg0ODUxMTQ3NDA2MTQ1fQ.EtgCdPAoyCr3e8S_IPOkN3y09Q5AJ2mBsPaqcxbsD3c
+Content-Type: application/x-www-form-urlencoded; charset=utf-8
+Host: localhost:8080
+Content-Length: 41
+
+callId=43&deviceId=3095&destination=%2A86
+```
+
+В качестве параметров запроса передаются идентификатор звонка, устройства и новый номер, на который нужно перевести звонок:
+
+- `callId`
+- `deviceId`
+- `destination`
+
+В случае успешного действия ответ не возвращается: нужно следить за событиями -- ответ будет там.
 
 ## Call Hangup
 
-_Not implemented yet._
+```http
+POST /api/call/hangup HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MDU0MzQ5NjIsImV4dCI6IjMwOTUiLCJpYXQiOjE1MDU0MzEzNTIsIm14IjoiNjMwMjIiLCJzdWIiOjQzODg0ODUxMTQ3NDA2MTQ1fQ.EtgCdPAoyCr3e8S_IPOkN3y09Q5AJ2mBsPaqcxbsD3c
+Content-Type: application/x-www-form-urlencoded; charset=utf-8
+Host: localhost:8080
+Content-Length: 23
+
+callId=43&deviceId=3095
+```
+
+В качестве параметров запроса передаются идентификатор звонка и устройства:
+
+- `callId`
+- `deviceId`
+
+В случае успешного действия ответ не возвращается: нужно следить за событиями -- ответ будет там.
 
 ## Статические файлы
 
