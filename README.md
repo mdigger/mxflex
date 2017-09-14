@@ -375,11 +375,13 @@ _Not implemented yet._
 
 По умолчанию используется конфигурационный файл с именем `mxflex.yaml`, в котором должна быть указана информация для подключения и авторизации серверного соединения MX:
 
+```yaml
 host: "localhost:8080"
 mx: {
     addr: "89.185.246.134",
     login: "d3test",
     password: "981211"
 }
+```
 
 Файл может быть в формате [YAML](http://www.yaml.org/spec/1.2/spec.html) или [JSON](http://www.json.org).
