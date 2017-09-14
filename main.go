@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"net"
@@ -70,6 +71,12 @@ func init() {
 }
 
 func main() {
+	if debug {
+		// выводим в лог ключ для подписи токенов
+		log.WithField("key",
+			base64.RawURLEncoding.EncodeToString(jwtConfig.Key.([]byte))).
+			Debug("jwt sign key")
+	}
 	// загружаем и разбираем конфигурационный файл
 	config, err := LoadConfig(configName)
 	if err != nil {

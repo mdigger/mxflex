@@ -18,7 +18,7 @@ import (
 var jwtConfig = &jwt.Config{
 	Created: true,                // добавляем дату создания
 	Expires: time.Hour,           // время жизни токена
-	Key:     jwt.NewHS256Key(64), // ключ для подписи данных
+	Key:     jwt.NewHS256Key(64), // ключ для подписи
 }
 
 // MXServer позволяет отслеживать информацию о звонках на сервер MX.
