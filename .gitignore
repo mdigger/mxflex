@@ -3,3 +3,5 @@ mxflex
 build/
 debug
 .vscode/
+*.paw
+*.yaml

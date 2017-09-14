@@ -21,15 +21,15 @@ info:
 	@echo "────────────────────────────────"
 
 package: info clean darwin linux
-	cp -R ./html ./build
-	cp mxflex.json ./build
+	# cp -R ./html ./build
+	cp mxflex.yaml ./build
 	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
 build:
 	go build -race -o $(appname) $(FLAGS)
 
 debug: build
-	./$(appname) -mx mx://d3test:981211@89.185.246.134 -ext 3095,3099,3044 -csta -color > csta.log
+	./$(appname) -debug -csta
 
 clean:
 	rm -rf build/

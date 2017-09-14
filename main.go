@@ -3,142 +3,149 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"flag"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/mdigger/csta"
 	"github.com/mdigger/log"
+	"github.com/mdigger/mx"
 	"github.com/mdigger/rest"
-	"github.com/mdigger/sse"
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// информация о сервисе и версия
 var (
-	appName = "mxflex"     // название сервиса
-	version = "0.7"        // версия
-	date    = "2017-09-11" // дата сборки
-	git     = ""           // версия git
+	appName = "MXFlex" // название сервиса
+	version = "1.8"    // версия
+	date    = ""       // дата сборки
+	git     = ""       // версия git
 
-	phone string
+	agent      = appName + "/" + version            // имя агента и сервера
+	configName = strings.ToLower(appName) + ".yaml" // имя файла с хранилищем токенов
+	debug      = false                              // флаг вывода отладочной информации
+	cstaOutput = false                              // флаг вывода команд и ответов CSTA
 )
 
-func main() {
-	var configName = appName + ".json"
-	flag.StringVar(&configName, "config", configName, "config `filename`")
-	var cstaOutput bool
-	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
-	var logFlags = log.LstdFlags //| log.Lindent
+func init() {
+	// инициализируем разбор параметров запуска сервиса
+	flag.StringVar(&configName, "config", configName, "configuration `filename`")
+	flag.BoolVar(&debug, "debug", debug, "debug output")
+	var logFlags = log.Lindent | log.LstdFlags
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
+	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
 	flag.Parse()
 
-	log.SetFlags(logFlags)
-	log.WithFields(log.Fields{
+	// подменяем символы на сообщения
+	log.Strings = map[log.Level]string{
+		log.DebugLevel:   "DEBUG",
+		log.InfoLevel:    "INFO",
+		log.WarningLevel: "WARN",
+		log.ErrorLevel:   "︎ERROR",
+	}
+	log.SetFlags(logFlags) // устанавливаем флаги вывода в лог
+	// разрешаем вывод отладочной информации, включая вывод команд CSTA
+	if debug {
+		mx.LogINOUT = map[bool]string{true: "EVN", false: "CMD"}
+		log.SetLevel(log.DebugLevel)
+	}
+	// выводим информацию о текущей версии
+	var verInfoFields = log.Fields{
 		"name":    appName,
 		"version": version,
-		"build":   date,
-		"git":     git,
-	}).Info("starting service")
-	log.SetLevel(log.DebugLevel)
-	if cstaOutput {
-		csta.SetLogOutput(os.Stdout)
-		csta.SetLogFlags(0)
 	}
+	if date != "" {
+		verInfoFields["builded"] = date
+	}
+	if git != "" {
+		verInfoFields["git"] = git
+		agent += " (" + git + ")"
+	}
+	log.WithFields(verInfoFields).Info("service info")
+}
 
-	var config = new(struct {
-		Host string `json:"host"`
-		MX   struct {
-			Addr     string `json:"addr"`
-			Login    string `json:"login"`
-			Password string `json:"password"`
-		} `json:"mx"`
-		Phone string   `json:"phone"`
-		Exts  []string `json:"exts"`
-	})
-	data, err := ioutil.ReadFile(configName)
+func main() {
+	// загружаем и разбираем конфигурационный файл
+	config, err := LoadConfig(configName)
 	if err != nil {
-		log.WithError(err).Error("config file error")
-		os.Exit(2)
-	}
-	if err = yaml.Unmarshal(data, config); err != nil {
 		log.WithError(err).Error("config error")
+		os.Exit(1)
+	}
+	// подключаемся к серверу MX
+	log.WithFields(log.Fields{
+		"host":  config.MX.Addr,
+		"login": config.MX.Login,
+	}).Info("connecting to mx")
+	monitor, err := NewMXMonitor(config.MX.Addr, config.MX.Login, config.MX.Password)
+	if err != nil {
+		log.WithError(err).Error("mx connection error")
 		os.Exit(2)
 	}
+	defer monitor.Close()
+	go monitor.monitoring() // запускаем мониторинг звонков
 
-	if config.Host == "" {
-		config.Host = "localhost:8000"
-	}
-	// инициализируем брокеров
-	if len(config.Exts) == 0 {
-		log.Error("no monitoring exts")
-		os.Exit(2)
-	}
-	if config.Phone == "" {
-		log.Error("no outgoing phone number")
-		os.Exit(2)
-	}
-	if config.MX.Addr == "" {
-		log.Error("no mx address")
-		os.Exit(2)
-	}
-	var brokers = make(map[string]*sse.Broker, len(config.Exts))
-	for _, ext := range config.Exts {
-		brokers[ext] = sse.New()
-	}
-	// инициализируем сервис
-	var service = &Service{
-		mxaddr:  config.MX.Addr,
-		brokers: brokers,
-		phone:   config.Phone,
-	}
 	// инициализируем обработку HTTP запросов
 	var mux = &rest.ServeMux{
 		Headers: map[string]string{
-			"Server":            "MXCallMonitor/1.0",
-			"X-API-Version":     "1.0",
-			"X-Service-Version": version,
+			"Server": agent,
 		},
 		Logger: log.WithField("type", "http"),
 	}
-	mux.Handle("GET", "/", service.CallMonitor) // страница с мониторингом звонков
-	mux.Handle("POST", "/", service.MakeCall)   // сделать звонок
+	var htmlFile = filepath.Join("html", "index.html")
+	mux.Handle("GET", "/", rest.File(htmlFile))
 	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
+
+	var handler = &Handler{monitor: monitor}
+	mux.Handle("POST", "/api/login", handler.Login)
+	mux.Handle("GET", "/api/logout", handler.Logout)
+	mux.Handle("GET", "/api/contacts", handler.Contacts)
+	mux.Handle("POST", "/api/call", handler.MakeCall)
+	mux.Handle("GET", "/api/events", handler.Events)
+	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
+
+	startHTTPServer(mux, config.Host)     // запускаем HTTP сервер
+	monitorSignals(os.Interrupt, os.Kill) // ожидаем сигнала остановки
+}
+
+// monitorSignals запускает мониторинг сигналов и возвращает значение, когда
+// получает сигнал. В качестве параметров передается список сигналов, которые
+// нужно отслеживать.
+func monitorSignals(signals ...os.Signal) os.Signal {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, signals...)
+	return <-signalChan
+}
+
+// StartHTTPServer запускает HTTP сервер.
+func startHTTPServer(mux http.Handler, host string) {
 	// инициализируем HTTP сервер
 	var server = &http.Server{
-		Addr:         config.Host,
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
 	}
 	// анализируем порт
-	httphost, port, err := net.SplitHostPort(config.Host)
+	var httphost, port, err = net.SplitHostPort(host)
 	if err, ok := err.(*net.AddrError); ok && err.Err == "missing port in address" {
 		httphost = err.Addr
 	}
-	var isIP = (net.ParseIP(httphost) != nil)
-	var notLocal = (httphost != "localhost" &&
+	var canCert = httphost != "localhost" &&
 		!strings.HasSuffix(httphost, ".local") &&
-		!isIP)
-	var canCert = notLocal && httphost != "" &&
+		net.ParseIP(httphost) == nil && httphost != "" &&
 		(port == "443" || port == "https" || port == "")
-
 	// добавляем автоматическую поддержку TLS сертификатов для сервиса
 	if canCert {
 		manager := autocert.Manager{
 			Prompt: autocert.AcceptTOS,
 			HostPolicy: func(_ context.Context, host string) error {
-				if config.Host != httphost {
-					log.WithField("host", config.Host).Error("unsupported https host")
+				if host != httphost {
+					log.WithField("host", host).Error("unsupported https host")
 					return errors.New("acme/autocert: host not configured")
 				}
 				return nil
@@ -173,102 +180,4 @@ func main() {
 			os.Exit(2)
 		}
 	}()
-
-	// устанавливаем соединение с MX
-	log.WithFields(log.Fields{
-		"host":  config.MX.Addr,
-		"login": config.MX.Login,
-		"type":  "Server",
-	}).Info("connecting to mx")
-	mx, err := csta.NewClient(config.MX.Addr, csta.Login{
-		UserName: config.MX.Login,
-		Password: config.MX.Password,
-		Type:     "Server",
-		Platform: "iPhone",
-		Version:  "1.0",
-	})
-	if err != nil {
-		log.WithError(err).Error("mx connection error")
-		return
-	}
-	defer mx.Close()
-
-	log.WithFields(log.Fields{
-		"total": len(config.Exts),
-		"exts":  strings.Join(config.Exts, ","),
-	}).Info("starting user monitors")
-	var monitors = mx.Monitor("DeliveredEvent")
-	for _, ext := range config.Exts {
-		// присоединяем к монитору данные о номере пользователя
-		if err = monitors.Start(ext, ext); err != nil {
-			break
-		}
-	}
-	if err != nil {
-		log.WithError(err).Error("monitor error")
-		return
-	}
-
-	// начинаем обработку событий мониторинга
-	for event := range monitors.Events {
-		// проверяем, что данное событие относится к мониторингу
-		ext, ok := event.Data.(string)
-		if !ok {
-			log.Debug("no ext")
-			continue
-		}
-		// проверяем, что брокер для пользователя поддерживается
-		broker, ok := brokers[ext]
-		if !ok {
-			log.Debug("not monitored")
-			continue
-		}
-		// преобразуем данные и отправляем брокеру
-		switch event.Name {
-		case "DeliveredEvent":
-			var delivered = &MXDelivery{Timestamp: time.Now().Unix()}
-			if err := event.Decode(delivered); err != nil {
-				log.WithError(err).Error("bad delivery event")
-				continue
-			}
-			// игнорируем, если не указано вызываемое устройство
-			if delivered.CalledDevice == "" {
-				log.Warning("ignore empty delivery")
-				continue
-			}
-			data, err := json.Marshal(delivered)
-			if err != nil {
-				log.WithError(err).Error("bad delivery json format")
-				continue
-			}
-			broker.Data("DeliveredEvent", string(data), "")
-			log.WithFields(log.Fields{
-				"callID": delivered.CallID,
-				"from":   delivered.CallingDevice,
-				"to":     delivered.CalledDevice,
-				"ext":    ext,
-			}).Info("incoming call")
-		}
-	}
-}
-
-// MXDelivery описывает структуру события входящего звонка
-type MXDelivery struct {
-	MonitorCrossRefID     uint64 `xml:"monitorCrossRefID" json:"-"`
-	CallID                uint64 `xml:"connection>callID" json:"callId"`
-	DeviceID              string `xml:"connection>deviceID" json:"deviceId"`
-	GlobalCallID          string `xml:"connection>globalCallID" json:"globalCallId"`
-	AlertingDevice        string `xml:"alertingDevice>deviceIdentifier" json:"alertingDevice"`
-	CallingDevice         string `xml:"callingDevice>deviceIdentifier" json:"callingDevice"`
-	CalledDevice          string `xml:"calledDevice>deviceIdentifier" json:"calledDevice"`
-	LastRedirectionDevice string `xml:"lastRedirectionDevice>deviceIdentifier" json:"lastRedirectionDevice"`
-	LocalConnectionInfo   string `xml:"localConnectionInfo" json:"localConnectionInfo"`
-	Cause                 string `xml:"cause" json:"cause"`
-	CallTypeFlags         uint32 `xml:"callTypeFlags" json:"callTypeFlags,omitempty"`
-	Cads                  []struct {
-		Name  string `xml:"name,attr" json:"name"`
-		Type  string `xml:"type,attr" json:"type"`
-		Value string `xml:",chardata" json:"value,omitempty"`
-	} `xml:"cad,omitempty" json:"cads,omitempty"`
-	Timestamp int64 `xml:"-" json:"time"`
 }
