@@ -21,7 +21,7 @@ info:
 	@echo "────────────────────────────────"
 
 package: info clean darwin linux
-	# cp -R ./html ./build
+	cp README.md ./build
 	cp mxflex.yaml ./build
 	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
