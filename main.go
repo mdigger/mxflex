@@ -81,13 +81,13 @@ func main() {
 		"host":  config.MX.Addr,
 		"login": config.MX.Login,
 	}).Info("connecting to mx")
-	monitor, err := NewMXMonitor(config.MX.Addr, config.MX.Login, config.MX.Password)
+	monitor, err := NewMXServer(config.MX.Addr, config.MX.Login, config.MX.Password)
 	if err != nil {
 		log.WithError(err).Error("mx connection error")
 		os.Exit(2)
 	}
 	defer monitor.Close()
-	go monitor.monitoring() // запускаем мониторинг звонков
+	go monitor.Monitoring() // запускаем мониторинг звонков
 
 	// инициализируем обработку HTTP запросов
 	var mux = &rest.ServeMux{
@@ -101,7 +101,7 @@ func main() {
 	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
 
-	var handler = &Handler{monitor: monitor}
+	var handler = &HTTPHandler{mxServer: monitor}
 	mux.Handle("POST", "/api/login", handler.Login)
 	mux.Handle("GET", "/api/logout", handler.Logout)
 	mux.Handle("GET", "/api/contacts", handler.Contacts)

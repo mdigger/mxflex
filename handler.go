@@ -14,14 +14,14 @@ import (
 	"github.com/mdigger/sse"
 )
 
-// Handler отвечает за обработку HTTP-запросов.
-type Handler struct {
-	monitor *MXMonitor
+// HTTPHandler отвечает за обработку HTTP-запросов.
+type HTTPHandler struct {
+	mxServer *MXServer
 }
 
 // Login авторизует пользователя MX, запускает мониторинг звонок для него и
 // отдает токен для доступа к API.
-func (h *Handler) Login(c *rest.Context) error {
+func (h *HTTPHandler) Login(c *rest.Context) error {
 	var (
 		login    = c.Form("login")
 		password = c.Form("password")
@@ -30,7 +30,7 @@ func (h *Handler) Login(c *rest.Context) error {
 		return c.Error(http.StatusBadRequest, "login required")
 	}
 	// авторизуем пользователя
-	info, err := h.monitor.login(login, password)
+	info, err := h.mxServer.Login(login, password)
 	if err != nil {
 		if errLogin, ok := err.(*mx.LoginError); ok {
 			err = c.Error(http.StatusForbidden, errLogin.Error())
@@ -42,7 +42,7 @@ func (h *Handler) Login(c *rest.Context) error {
 		return err
 	}
 	// запускаем мониторинг звонков
-	if err = h.monitor.monitorStart(info.Ext); err != nil {
+	if err = h.mxServer.MonitorStart(info.Ext); err != nil {
 		return err
 	}
 	// генерируем токен авторизации пользователя
@@ -67,7 +67,7 @@ func (h *Handler) Login(c *rest.Context) error {
 
 // tokenExt проверяет токен авторизации и возвращает внутренний номер
 // пользователя MX.
-func (h *Handler) tokenExt(c *rest.Context) (string, error) {
+func (h *HTTPHandler) tokenExt(c *rest.Context) (string, error) {
 	var token = c.Request.FormValue("access_token")
 	if token == "" {
 		// запрашивает токен авторизации из заголовка
@@ -93,16 +93,16 @@ func (h *Handler) tokenExt(c *rest.Context) (string, error) {
 }
 
 // Logout останавливает мониторинг звонков пользователя.
-func (h *Handler) Logout(c *rest.Context) error {
+func (h *HTTPHandler) Logout(c *rest.Context) error {
 	ext, err := h.tokenExt(c) // распаковываем и проверяем токен
 	if err != nil {
 		return err
 	}
-	return h.monitor.monitorStop(ext) // останавливаем мониторинг
+	return h.mxServer.MonitorStop(ext) // останавливаем мониторинг
 }
 
 // MakeCall осуществляет серверный звонок.
-func (h *Handler) MakeCall(c *rest.Context) error {
+func (h *HTTPHandler) MakeCall(c *rest.Context) error {
 	ext, err := h.tokenExt(c) // распаковываем и проверяем токен
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func (h *Handler) MakeCall(c *rest.Context) error {
 	if to == "" {
 		return c.Error(http.StatusBadRequest, "to field is empty")
 	}
-	callInfo, err := h.monitor.makeCall(from, to)
+	callInfo, err := h.mxServer.MakeCall(from, to)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (h *Handler) MakeCall(c *rest.Context) error {
 }
 
 // Events отдает события о звонках в виде SSE.
-func (h *Handler) Events(c *rest.Context) error {
+func (h *HTTPHandler) Events(c *rest.Context) error {
 	ext, err := h.tokenExt(c) // распаковываем и проверяем токен
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (h *Handler) Events(c *rest.Context) error {
 		return c.Error(http.StatusNotAcceptable, "only sse support")
 	}
 	var broker *sse.Broker
-	h.monitor.monitors.Range(func(_, data interface{}) bool {
+	h.mxServer.monitors.Range(func(_, data interface{}) bool {
 		var md = data.(*monitorData)
 		if md.Extension == ext {
 			broker = md.Broker
@@ -159,14 +159,14 @@ func (h *Handler) Events(c *rest.Context) error {
 }
 
 // ConnectionInfo отдает информацию об активных соединениях и мониторинге.
-func (h *Handler) ConnectionInfo(c *rest.Context) error {
-	return c.Write(rest.JSON{"monitoring": h.monitor.connectionInfo()})
+func (h *HTTPHandler) ConnectionInfo(c *rest.Context) error {
+	return c.Write(rest.JSON{"monitoring": h.mxServer.ConnectionInfo()})
 }
 
 // Contacts отдает список контактов из серверной адресной книги.
-func (h *Handler) Contacts(c *rest.Context) error {
+func (h *HTTPHandler) Contacts(c *rest.Context) error {
 	if _, err := h.tokenExt(c); err != nil {
 		return err
 	}
-	return c.Write(rest.JSON{"contacts": h.monitor.contacts()})
+	return c.Write(rest.JSON{"contacts": h.mxServer.Contacts()})
 }

@@ -21,17 +21,17 @@ var jwtConfig = &jwt.Config{
 	Key:     jwt.Nonce(255)(), // случайный ключ для подписи
 }
 
-// MXMonitor позволяет отслеживать информацию о звонках на сервер MX.
-type MXMonitor struct {
+// MXServer позволяет отслеживать информацию о звонках на сервер MX.
+type MXServer struct {
 	mxHost   string   // адрес сервера
 	conn     *mx.Conn // серверное соединение с MX
 	monitors sync.Map // идентификаторы запущенных мониторов и внутренние номера пользователей
 	ab       sync.Map // серверная адресная книга
 }
 
-// NewMXMonitor подключается и возвращает серверное соединение с MX для
+// NewMXServer подключается и возвращает серверное соединение с MX для
 // мониторинга звонков.
-func NewMXMonitor(mxHost, login, password string) (*MXMonitor, error) {
+func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 	conn, err := mx.Connect(mxHost)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func NewMXMonitor(mxHost, login, password string) (*MXMonitor, error) {
 		conn.Close()
 		return nil, err
 	}
-	var monitor = &MXMonitor{
+	var monitor = &MXServer{
 		mxHost: mxHost,
 		conn:   conn,
 	}
@@ -65,7 +65,7 @@ func NewMXMonitor(mxHost, login, password string) (*MXMonitor, error) {
 }
 
 // Close закрывает серверное соединение.
-func (m *MXMonitor) Close() error {
+func (m *MXServer) Close() error {
 	m.monitors.Range(func(mID, data interface{}) bool {
 		m.monitors.Delete(mID)
 		data.(*monitorData).Close()
@@ -74,8 +74,8 @@ func (m *MXMonitor) Close() error {
 	return m.conn.Close()
 }
 
-// login авторизует пользователя MX и возвращает информацию о нем.
-func (m *MXMonitor) login(login, password string) (*mx.Info, error) {
+// Login авторизует пользователя MX и возвращает информацию о нем.
+func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 	log.WithField("login", login).Info("check mx login")
 	conn, err := mx.Connect(m.mxHost)
 	if err != nil {
@@ -105,7 +105,7 @@ type monitorData struct {
 }
 
 // MonitorStart запускает пользовательский монитор.
-func (m *MXMonitor) monitorStart(ext string) error {
+func (m *MXServer) MonitorStart(ext string) error {
 	// проверяем, что монитор еще не запущен
 	var started bool
 	m.monitors.Range(func(_, data interface{}) bool {
@@ -142,7 +142,7 @@ func (m *MXMonitor) monitorStart(ext string) error {
 }
 
 // MonitorStop останавливает пользовательский монитор.
-func (m *MXMonitor) monitorStop(ext string) error {
+func (m *MXServer) MonitorStop(ext string) error {
 	// находим идентификатор запущенного монитора пользователя
 	var monitorID int64
 	m.monitors.Range(func(mID, data interface{}) bool {
@@ -168,8 +168,8 @@ func (m *MXMonitor) monitorStop(ext string) error {
 	return err
 }
 
-// makeCall отправляет команду на серверный звонок MX.
-func (m *MXMonitor) makeCall(from, to string) (*MakeCallResponse, error) {
+// MakeCall отправляет команду на серверный звонок MX.
+func (m *MXServer) MakeCall(from, to string) (*MakeCallResponse, error) {
 	// инициируем звонок на номер
 	type callingDevice struct {
 		Type string `xml:"typeOfNumber,attr"`
@@ -206,8 +206,8 @@ type MakeCallResponse struct {
 	CalledDevice string `xml:"calledDevice" json:"called"`
 }
 
-// monitoring запускает процесс мониторинга звонков.
-func (m *MXMonitor) monitoring() error {
+// Monitoring запускает процесс мониторинга звонков.
+func (m *MXServer) Monitoring() error {
 	// запускаем мониторинг изменений в адресной книге
 	if _, err := m.conn.SendWithResponse("<MonitorStartAb/>"); err != nil {
 		return err
@@ -348,9 +348,9 @@ func (m *MXMonitor) monitoring() error {
 		"EstablishedEvent", "ConnectionClearedEvent")
 }
 
-// connectionInfo возвращает информацию о мониторинге и количестве подключений
+// ConnectionInfo возвращает информацию о мониторинге и количестве подключений
 // к станице с событиями.
-func (m *MXMonitor) connectionInfo() map[string]int {
+func (m *MXServer) ConnectionInfo() map[string]int {
 	var result = make(map[string]int)
 	m.monitors.Range(func(mID, data interface{}) bool {
 		var md = data.(*monitorData)
@@ -363,8 +363,8 @@ func (m *MXMonitor) connectionInfo() map[string]int {
 	return result
 }
 
-// contacts возвращает список контактов.
-func (m *MXMonitor) contacts() []*mx.Contact {
+// Contacts возвращает список контактов.
+func (m *MXServer) Contacts() []*mx.Contact {
 	var list []*mx.Contact
 	m.ab.Range(func(_, contact interface{}) bool {
 		list = append(list, contact.(*mx.Contact))
