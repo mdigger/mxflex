@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mdigger/jwt"
 	"github.com/mdigger/log"
@@ -17,6 +19,65 @@ import (
 // HTTPHandler отвечает за обработку HTTP-запросов.
 type HTTPHandler struct {
 	mxServer *MXServer
+	stopped  bool // флаг остановки сервиса
+	mu       sync.RWMutex
+}
+
+// NewHTTPHandler инициализирует и возвращает обработчик HTTP-запросов к
+// серверу MX.
+func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
+	mxServer, err := NewMXServer(host, login, password)
+	if err != nil {
+		return nil, err
+	}
+	var handler = &HTTPHandler{mxServer: mxServer}
+	// запускаем мониторинг разрыва соединения с сервером MX
+	go func(mxs *MXServer) {
+	wait:
+		var err = <-mxs.conn.Done()
+	reconnect:
+		// прекращаем, если это остановка сервиса
+		handler.mu.RLock()
+		if handler.stopped {
+			handler.mu.RUnlock()
+			return
+		}
+		handler.mu.RUnlock()
+		log.WithError(err).Error("mx connection error")
+		log.WithField("delay", time.Minute.String()).Info("reconnecting to mx")
+		time.Sleep(time.Minute) // задержка перед переподключением
+		mxs, err = NewMXServer(host, login, password)
+		// подключаемся к серверу MX
+		if err != nil {
+			if _, ok := err.(*mx.LoginError); ok {
+				log.WithError(err).Error("mx connection login error")
+				return
+			}
+			goto reconnect
+		}
+		handler.mu.Lock()
+		handler.mxServer = mxs
+		handler.mu.Unlock()
+		goto wait
+	}(mxServer)
+	return handler, nil
+}
+
+// Close закрывает соединение с сервером MX.
+func (h *HTTPHandler) Close() error {
+	h.mu.Lock()
+	h.stopped = true
+	var err = h.mxServer.Close()
+	h.mu.Unlock()
+	return err
+}
+
+// mx возвращает ссылку на MXServer, блокируя одновременный доступ на изменение.
+func (h *HTTPHandler) mx() *MXServer {
+	h.mu.RLock()
+	var mxs = h.mxServer
+	h.mu.RUnlock()
+	return mxs
 }
 
 // Login авторизует пользователя MX, запускает мониторинг звонок для него и
@@ -30,7 +91,7 @@ func (h *HTTPHandler) Login(c *rest.Context) error {
 		return c.Error(http.StatusBadRequest, "login required")
 	}
 	// авторизуем пользователя
-	info, err := h.mxServer.Login(login, password)
+	info, err := h.mx().Login(login, password)
 	if err != nil {
 		if errLogin, ok := err.(*mx.LoginError); ok {
 			err = c.Error(http.StatusForbidden, errLogin.Error())
@@ -42,7 +103,7 @@ func (h *HTTPHandler) Login(c *rest.Context) error {
 		return err
 	}
 	// запускаем мониторинг звонков
-	if err = h.mxServer.MonitorStart(info.Ext); err != nil {
+	if err = h.mx().MonitorStart(info.Ext); err != nil {
 		return err
 	}
 	// генерируем токен авторизации пользователя
@@ -98,7 +159,7 @@ func (h *HTTPHandler) Logout(c *rest.Context) error {
 	if err != nil {
 		return err
 	}
-	return h.mxServer.MonitorStop(ext) // останавливаем мониторинг
+	return h.mx().MonitorStop(ext) // останавливаем мониторинг
 }
 
 // MakeCall осуществляет серверный звонок.
@@ -117,7 +178,7 @@ func (h *HTTPHandler) MakeCall(c *rest.Context) error {
 	if to == "" {
 		return c.Error(http.StatusBadRequest, "to field is empty")
 	}
-	callInfo, err := h.mxServer.MakeCall(from, to)
+	callInfo, err := h.mx().MakeCall(from, to)
 	if err != nil {
 		return err
 	}
@@ -134,7 +195,7 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 		return c.Error(http.StatusNotAcceptable, "only sse support")
 	}
 	var broker *sse.Broker
-	h.mxServer.monitors.Range(func(_, data interface{}) bool {
+	h.mx().monitors.Range(func(_, data interface{}) bool {
 		var md = data.(*monitorData)
 		if md.Extension == ext {
 			broker = md.Broker
@@ -160,7 +221,7 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 
 // ConnectionInfo отдает информацию об активных соединениях и мониторинге.
 func (h *HTTPHandler) ConnectionInfo(c *rest.Context) error {
-	return c.Write(rest.JSON{"monitoring": h.mxServer.ConnectionInfo()})
+	return c.Write(rest.JSON{"monitoring": h.mx().ConnectionInfo()})
 }
 
 // Contacts отдает список контактов из серверной адресной книги.
@@ -168,5 +229,5 @@ func (h *HTTPHandler) Contacts(c *rest.Context) error {
 	if _, err := h.tokenExt(c); err != nil {
 		return err
 	}
-	return c.Write(rest.JSON{"contacts": h.mxServer.Contacts()})
+	return c.Write(rest.JSON{"contacts": h.mx().Contacts()})
 }

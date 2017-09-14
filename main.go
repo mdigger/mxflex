@@ -52,7 +52,7 @@ func init() {
 	log.SetFlags(logFlags) // устанавливаем флаги вывода в лог
 	// разрешаем вывод отладочной информации, включая вывод команд CSTA
 	if debug {
-		mx.LogINOUT = map[bool]string{true: "EVN", false: "CMD"}
+		mx.LogINOUT = map[bool]string{true: "MX ->", false: "MX <-"}
 		log.SetLevel(log.DebugLevel)
 	}
 	// выводим информацию о текущей версии
@@ -88,12 +88,13 @@ func main() {
 		"host":  config.MX.Addr,
 		"login": config.MX.Login,
 	}).Info("connecting to mx")
-	monitor, err := NewMXServer(config.MX.Addr, config.MX.Login, config.MX.Password)
+	handler, err := NewHTTPHandler(
+		config.MX.Addr, config.MX.Login, config.MX.Password)
 	if err != nil {
 		log.WithError(err).Error("mx connection error")
 		os.Exit(2)
 	}
-	defer monitor.Close()
+	defer handler.Close()
 
 	// инициализируем обработку HTTP запросов
 	var mux = &rest.ServeMux{
@@ -107,13 +108,14 @@ func main() {
 	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
 	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
 
-	var handler = &HTTPHandler{mxServer: monitor}
 	mux.Handle("POST", "/api/login", handler.Login)
 	mux.Handle("GET", "/api/logout", handler.Logout)
 	mux.Handle("GET", "/api/contacts", handler.Contacts)
 	mux.Handle("POST", "/api/call", handler.MakeCall)
 	mux.Handle("GET", "/api/events", handler.Events)
-	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
+	if debug {
+		mux.Handle("GET", "/api/info", handler.ConnectionInfo)
+	}
 
 	startHTTPServer(mux, config.Host)     // запускаем HTTP сервер
 	monitorSignals(os.Interrupt, os.Kill) // ожидаем сигнала остановки
