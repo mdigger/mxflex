@@ -22,7 +22,7 @@ info:
 
 package: info clean darwin linux
 	cp README.md ./build
-	cp mxflex.yaml ./build
+	cp mxflex.toml ./build
 	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
 build:
