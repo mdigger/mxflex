@@ -28,7 +28,7 @@ var (
 	git     = ""       // версия git
 
 	agent      = appName + "/" + version            // имя агента и сервера
-	configName = strings.ToLower(appName) + ".yaml" // имя файла с хранилищем токенов
+	configName = strings.ToLower(appName) + ".toml" // имя файла с хранилищем токенов
 	debug      = false                              // флаг вывода отладочной информации
 	cstaOutput = false                              // флаг вывода команд и ответов CSTA
 )
