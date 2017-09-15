@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 
-	yaml "gopkg.in/yaml.v2"
+	"github.com/BurntSushi/toml"
 )
 
 // Config описывает формат конфигурационного файла.
@@ -25,7 +25,7 @@ func LoadConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 	var config = new(Config)
-	if err = yaml.Unmarshal(data, config); err != nil {
+	if err = toml.Unmarshal(data, config); err != nil {
 		return nil, err
 	}
 	if config.Host == "" {
