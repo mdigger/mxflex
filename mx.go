@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/mdigger/jwt"
-
-	oldlog "github.com/mdigger/log"
 	"github.com/mdigger/log3"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/sse"
@@ -38,7 +36,7 @@ func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 		return nil, err
 	}
 	if cstaOutput {
-		conn.SetLogger(oldlog.WithField("type", "server"))
+		conn.SetLogger(log.New("MXServer"))
 	}
 	if _, err = conn.Login(mx.Login{
 		UserName: login,
@@ -84,7 +82,7 @@ func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 		return nil, err
 	}
 	if cstaOutput {
-		conn.SetLogger(oldlog.WithField("type", "login"))
+		conn.SetLogger(log.New("MXLogin"))
 	}
 	loginInfo, err := conn.Login(mx.Login{
 		UserName: login,
