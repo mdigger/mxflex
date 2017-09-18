@@ -9,7 +9,8 @@ import (
 
 	"github.com/mdigger/jwt"
 
-	"github.com/mdigger/log"
+	oldlog "github.com/mdigger/log"
+	"github.com/mdigger/log3"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/sse"
 )
@@ -37,7 +38,7 @@ func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 		return nil, err
 	}
 	if cstaOutput {
-		conn.SetLogger(log.WithField("type", "server"))
+		conn.SetLogger(oldlog.WithField("type", "server"))
 	}
 	if _, err = conn.Login(mx.Login{
 		UserName: login,
@@ -77,13 +78,13 @@ func (m *MXServer) Close() error {
 
 // Login авторизует пользователя MX и возвращает информацию о нем.
 func (m *MXServer) Login(login, password string) (*mx.Info, error) {
-	log.WithField("login", login).Info("check mx login")
+	log.Info("check mx login", "login", login)
 	conn, err := mx.Connect(m.mxHost)
 	if err != nil {
 		return nil, err
 	}
 	if cstaOutput {
-		conn.SetLogger(log.WithField("type", "login"))
+		conn.SetLogger(oldlog.WithField("type", "login"))
 	}
 	loginInfo, err := conn.Login(mx.Login{
 		UserName: login,
@@ -223,11 +224,11 @@ func (m *MXServer) monitoring() error {
 				*mx.Contact `xml:"abentry"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.WithError(err).Errorf("mx event %s parse error", resp.Name)
+				log.IfError(err, "mx event parse error", "event", resp.Name)
 				return nil
 			}
 			m.ab.Store(update.JID, update.Contact)
-			log.WithField("jid", update.JID).Debug("contact updated")
+			log.Debug("contact updated", "jid", update.JID)
 			return nil
 		case "AbDeleteUserEvent":
 			// удаление пользователя из адресной книги
@@ -235,11 +236,11 @@ func (m *MXServer) monitoring() error {
 				JID mx.JID `xml:"userId"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.WithError(err).Errorf("mx event %s parse error", resp.Name)
+				log.IfError(err, "mx event parse error", "event", resp.Name)
 				return nil
 			}
 			m.ab.Delete(update.JID)
-			log.WithField("jid", update.JID).Debug("contact deleted")
+			log.Debug("contact deleted", "jid", update.JID)
 			return nil
 		}
 
@@ -248,7 +249,7 @@ func (m *MXServer) monitoring() error {
 			ID int64 `xml:"monitorCrossRefID"`
 		})
 		if err := resp.Decode(monitor); err != nil {
-			log.WithError(err).Error("bad monitored event format")
+			log.IfError(err, "bad monitored event format")
 			return nil
 		}
 		var mData *monitorData
@@ -329,20 +330,19 @@ func (m *MXServer) monitoring() error {
 			})
 		}
 		if err := resp.Decode(event); err != nil {
-			log.WithError(err).Error("event decode error")
+			log.IfError(err, "event decode error")
 			return nil
 		}
 		data, err := json.Marshal(event)
 		if err != nil {
-			log.WithError(err).Error("json encode event error")
+			log.IfError(err, "json encode event error")
 			return nil
 		}
 		mData.Data(resp.Name, string(data), "") // отсылаем данные
-		log.WithFields(log.Fields{
-			"event":    resp.Name,
-			"ext":      mData.Extension,
-			"monitors": mData.Connected(),
-		}).Info("monitoring event")
+		log.Info("monitoring event",
+			"event", resp.Name,
+			"ext", mData.Extension,
+			"monitors", mData.Connected())
 		return nil
 	}, "AbUpdateUserEvent", "AbAddUserEvent", "AbDeleteUserEvent",
 		"OriginatedEvent", "DivertedEvent", "DeliveredEvent",

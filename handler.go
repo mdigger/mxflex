@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/mdigger/jwt"
-	"github.com/mdigger/log"
+	"github.com/mdigger/log3"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/rest"
 	"github.com/mdigger/sse"
@@ -44,14 +44,14 @@ func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
 			return
 		}
 		handler.mu.RUnlock()
-		log.WithError(err).Error("mx connection error")
-		log.WithField("delay", time.Minute.String()).Info("reconnecting to mx")
+		log.IfError(err, "mx connection error")
+		log.Info("reconnecting to mx", "delay", time.Minute.String())
 		time.Sleep(time.Minute) // задержка перед переподключением
 		mxs, err = NewMXServer(host, login, password)
 		// подключаемся к серверу MX
 		if err != nil {
 			if _, ok := err.(*mx.LoginError); ok {
-				log.WithError(err).Error("mx connection login error")
+				log.IfError(err, "mx connection login error")
 				return
 			}
 			goto reconnect
@@ -207,16 +207,11 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 	if broker == nil {
 		return c.Error(http.StatusForbidden, "not monitored")
 	}
-	var ctxlog = log.WithFields(log.Fields{
-		"ext":  ext,
-		"type": "sse",
-	})
-	ctxlog.WithField("count", broker.Connected()+1).
-		Debug("sse client connected")
+	var ctxlog = log.New("sse")
+	ctxlog.Debug("connected", "count", broker.Connected()+1)
 	// запускаем отдачу событий
 	broker.ServeHTTP(c.Response, c.Request)
-	ctxlog.WithField("count", broker.Connected()).
-		Debug("sse client disconnected")
+	ctxlog.Debug("disconnected", "count", broker.Connected())
 	return nil
 }
 
