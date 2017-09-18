@@ -36,15 +36,15 @@ func init() {
 	// инициализируем разбор параметров запуска сервиса
 	flag.StringVar(&configName, "config", configName, "configuration `filename`")
 	flag.BoolVar(&debug, "debug", debug, "debug output")
-	var logFlags = log.LstdFlags | log.LColor
+	var logFlags = log.LstdFlags
 	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
 	flag.Parse()
 
-	log.SetFormatter(log.Console(logFlags, 32)) // устанавливаем флаги вывода в лог
+	log.SetFormatter(log.Console(logFlags, 28)) // устанавливаем флаги вывода в лог
 	// разрешаем вывод отладочной информации, включая вывод команд CSTA
 	if debug {
-		mx.LogINOUT = map[bool]string{true: "MX ->", false: "MX <-"}
+		mx.LogINOUT = map[bool]string{true: "->", false: "<-"}
 		log.SetLevel(log.TRACE)
 	} else {
 		log.SetLevel(log.INFO)
