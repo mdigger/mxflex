@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mdigger/log3"
+	"github.com/mdigger/log4"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/rest"
 	"golang.org/x/crypto/acme/autocert"
@@ -36,12 +36,11 @@ func init() {
 	// инициализируем разбор параметров запуска сервиса
 	flag.StringVar(&configName, "config", configName, "configuration `filename`")
 	flag.BoolVar(&debug, "debug", debug, "debug output")
-	var logFlags = log.LstdFlags
-	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
 	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
 	flag.Parse()
 
-	log.SetFormatter(log.Console(logFlags, 28)) // устанавливаем флаги вывода в лог
+	// настраиваем вывод лога
+
 	// разрешаем вывод отладочной информации, включая вывод команд CSTA
 	if debug {
 		mx.LogINOUT = map[bool]string{true: "->", false: "<-"}

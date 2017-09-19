@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/mdigger/jwt"
-	"github.com/mdigger/log3"
+	"github.com/mdigger/log4"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/rest"
 	"github.com/mdigger/sse"
