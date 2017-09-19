@@ -219,14 +219,14 @@ func (m *MXServer) monitoring() error {
 		case "AbUpdateUserEvent", "AbAddUserEvent":
 			// добавление/изменения пользователя в адресной книге
 			var update = new(struct {
-				*mx.Contact `xml:"abentry"`
+				Contact *mx.Contact `xml:"abentry"`
 			})
 			if err := resp.Decode(update); err != nil {
 				log.IfError(err, "mx event parse error", "event", resp.Name)
 				return nil
 			}
-			m.ab.Store(update.JID, update.Contact)
-			log.Debug("contact updated", "jid", update.JID)
+			m.ab.Store(update.Contact.JID, update.Contact)
+			log.Debug("contact updated", "jid", update.Contact.JID)
 			return nil
 		case "AbDeleteUserEvent":
 			// удаление пользователя из адресной книги
