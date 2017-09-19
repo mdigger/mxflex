@@ -375,19 +375,19 @@ func (m *MXServer) Contacts() []*mx.Contact {
 	return list
 }
 
-// CallHold подвешивает звонок.
-func (m *MXServer) CallHold(callID uint64, deviceID string) error {
-	var cmd = &struct {
-		XMLName  xml.Name `xml:"HoldCall"`
-		CallID   uint64   `xml:"callToBeHeld>callID"`
-		DeviceID string   `xml:"callToBeHeld>deviceID"`
-	}{
-		CallID:   callID,
-		DeviceID: deviceID,
-	}
-	_, err := m.conn.SendWithResponse(cmd)
-	return err
-}
+// // CallHold подвешивает звонок.
+// func (m *MXServer) CallHold(callID uint64, deviceID string) error {
+// 	var cmd = &struct {
+// 		XMLName  xml.Name `xml:"HoldCall"`
+// 		CallID   uint64   `xml:"callToBeHeld>callID"`
+// 		DeviceID string   `xml:"callToBeHeld>deviceID"`
+// 	}{
+// 		CallID:   callID,
+// 		DeviceID: deviceID,
+// 	}
+// 	_, err := m.conn.SendWithResponse(cmd)
+// 	return err
+// }
 
 // CallHangup сбрасывает звонок.
 func (m *MXServer) CallHangup(callID uint64, deviceID string) error {
@@ -405,10 +405,10 @@ func (m *MXServer) CallHangup(callID uint64, deviceID string) error {
 // CallTransfer перебрасывает звонок.
 func (m *MXServer) CallTransfer(callID uint64, deviceID, destination string) error {
 	var cmd = &struct {
-		XMLName        xml.Name `xml:"DeflectCall"`
-		CallID         uint64   `xml:"callToBeDiverted>callID"`
-		DeviceID       string   `xml:"callToBeDiverted>deviceID"`
-		NewDestination string   `xml:"newDestination"`
+		XMLName        xml.Name `xml:"SingleStepTransferCall"`
+		CallID         uint64   `xml:"activeCall>callID"`
+		DeviceID       string   `xml:"activeCall>deviceID"`
+		NewDestination string   `xml:"transferredTo"`
 	}{
 		CallID:         callID,
 		DeviceID:       deviceID,

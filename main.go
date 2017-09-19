@@ -99,7 +99,7 @@ func main() {
 	mux.Handle("GET", "/api/logout", handler.Logout)
 	mux.Handle("GET", "/api/contacts", handler.Contacts)
 	mux.Handle("POST", "/api/call", handler.MakeCall)
-	mux.Handle("POST", "/api/call/hold", handler.CallHold)
+	// mux.Handle("POST", "/api/call/hold", handler.CallHold)
 	mux.Handle("POST", "/api/call/hangup", handler.CallHangup)
 	mux.Handle("POST", "/api/call/transfer", handler.CallTransfer)
 	mux.Handle("GET", "/api/events", handler.Events)
