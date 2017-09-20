@@ -13,8 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mdigger/log4"
-	"github.com/mdigger/mx"
+	"github.com/mdigger/log"
 	"github.com/mdigger/rest"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -22,32 +21,23 @@ import (
 // информация о сервисе и версия
 var (
 	appName = "MXFlex" // название сервиса
-	version = "1.8"    // версия
+	version = "1.9"    // версия
 	date    = ""       // дата сборки
 	git     = ""       // версия git
 
 	agent      = appName + "/" + version            // имя агента и сервера
 	configName = strings.ToLower(appName) + ".toml" // имя файла с хранилищем токенов
-	debug      = false                              // флаг вывода отладочной информации
-	cstaOutput = false                              // флаг вывода команд и ответов CSTA
 )
 
 func init() {
 	// инициализируем разбор параметров запуска сервиса
 	flag.StringVar(&configName, "config", configName, "configuration `filename`")
-	flag.BoolVar(&debug, "debug", debug, "debug output")
-	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
+	var logLevel = int(log.INFO)
+	flag.IntVar(&logLevel, "log", logLevel, "log `level`")
 	flag.Parse()
 
 	// настраиваем вывод лога
-
-	// разрешаем вывод отладочной информации, включая вывод команд CSTA
-	if debug {
-		mx.LogINOUT = map[bool]string{true: "->", false: "<-"}
-		log.SetLevel(log.TRACE)
-	} else {
-		log.SetLevel(log.INFO)
-	}
+	log.SetLevel(log.Level(logLevel))
 	// выводим информацию о текущей версии
 	var verInfoFields = []interface{}{
 		"name", appName,
@@ -103,9 +93,7 @@ func main() {
 	mux.Handle("POST", "/api/call/hangup", handler.CallHangup)
 	mux.Handle("POST", "/api/call/transfer", handler.CallTransfer)
 	mux.Handle("GET", "/api/events", handler.Events)
-	if debug {
-		mux.Handle("GET", "/api/info", handler.ConnectionInfo)
-	}
+	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
 
 	startHTTPServer(mux, config.Host)     // запускаем HTTP сервер
 	monitorSignals(os.Interrupt, os.Kill) // ожидаем сигнала остановки
@@ -127,6 +115,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
+		ErrorLog:     log.StdLog(log.ERROR, "http"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)

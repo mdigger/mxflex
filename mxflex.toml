@@ -1,4 +1,4 @@
-host = "localhost:8080"
+host = "localhost:8070"
 
 [mx]
 addr = "89.185.246.134"
