@@ -29,7 +29,7 @@ build:
 	go build -race -o $(appname) $(FLAGS)
 
 debug: build
-	./$(appname) -debug -csta
+	./$(appname) -log=-2
 
 clean:
 	rm -rf build/

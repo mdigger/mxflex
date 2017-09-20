@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"flag"
 	"net"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/mdigger/log"
-	"github.com/mdigger/mx"
 	"github.com/mdigger/rest"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -23,75 +21,54 @@ import (
 // информация о сервисе и версия
 var (
 	appName = "MXFlex" // название сервиса
-	version = "1.8"    // версия
+	version = "1.9"    // версия
 	date    = ""       // дата сборки
 	git     = ""       // версия git
 
 	agent      = appName + "/" + version            // имя агента и сервера
 	configName = strings.ToLower(appName) + ".toml" // имя файла с хранилищем токенов
-	debug      = false                              // флаг вывода отладочной информации
-	cstaOutput = false                              // флаг вывода команд и ответов CSTA
 )
 
 func init() {
 	// инициализируем разбор параметров запуска сервиса
 	flag.StringVar(&configName, "config", configName, "configuration `filename`")
-	flag.BoolVar(&debug, "debug", debug, "debug output")
-	var logFlags = log.Lindent | log.LstdFlags
-	flag.IntVar(&logFlags, "logflag", logFlags, "log flags")
-	flag.BoolVar(&cstaOutput, "csta", cstaOutput, "CSTA output")
+	var logLevel = int(log.INFO)
+	flag.IntVar(&logLevel, "log", logLevel, "log `level`")
 	flag.Parse()
 
-	// подменяем символы на сообщения
-	log.Strings = map[log.Level]string{
-		log.DebugLevel:   "DEBUG",
-		log.InfoLevel:    "INFO",
-		log.WarningLevel: "WARN",
-		log.ErrorLevel:   "︎ERROR",
-	}
-	log.SetFlags(logFlags) // устанавливаем флаги вывода в лог
-	// разрешаем вывод отладочной информации, включая вывод команд CSTA
-	if debug {
-		mx.LogINOUT = map[bool]string{true: "MX ->", false: "MX <-"}
-		log.SetLevel(log.DebugLevel)
-	}
+	// настраиваем вывод лога
+	log.SetLevel(log.Level(logLevel))
 	// выводим информацию о текущей версии
-	var verInfoFields = log.Fields{
-		"name":    appName,
-		"version": version,
+	var verInfoFields = []interface{}{
+		"name", appName,
+		"version", version,
 	}
 	if date != "" {
-		verInfoFields["builded"] = date
+		verInfoFields = append(verInfoFields, "builded", date)
 	}
 	if git != "" {
-		verInfoFields["git"] = git
+		verInfoFields = append(verInfoFields, "git", git)
 		agent += " (" + git + ")"
 	}
-	log.WithFields(verInfoFields).Info("service info")
+	log.Info("service info", verInfoFields...)
 }
 
 func main() {
-	if debug {
-		// выводим в лог ключ для подписи токенов
-		log.WithField("key",
-			base64.RawURLEncoding.EncodeToString(jwtConfig.Key.([]byte))).
-			Debug("jwt sign key")
-	}
+	// выводим в лог ключ для подписи токенов
+	log.Debug("jwt sign key", "key",
+		base64.RawURLEncoding.EncodeToString(jwtConfig.Key.([]byte)))
 	// загружаем и разбираем конфигурационный файл
 	config, err := LoadConfig(configName)
 	if err != nil {
-		log.WithError(err).Error("config error")
+		log.IfError(err, "config error")
 		os.Exit(1)
 	}
 	// подключаемся к серверу MX
-	log.WithFields(log.Fields{
-		"host":  config.MX.Addr,
-		"login": config.MX.Login,
-	}).Info("connecting to mx")
+	log.Info("connecting to mx", "host", config.MX.Addr, "login", config.MX.Login)
 	handler, err := NewHTTPHandler(
 		config.MX.Addr, config.MX.Login, config.MX.Password)
 	if err != nil {
-		log.WithError(err).Error("mx connection error")
+		log.IfError(err, "mx connection error")
 		os.Exit(2)
 	}
 	defer handler.Close()
@@ -101,7 +78,7 @@ func main() {
 		Headers: map[string]string{
 			"Server": agent,
 		},
-		Logger: log.WithField("type", "http"),
+		// Logger: log.WithField("type", "http"),
 	}
 	var htmlFile = filepath.Join("html", "index.html")
 	mux.Handle("GET", "/", rest.File(htmlFile))
@@ -112,13 +89,11 @@ func main() {
 	mux.Handle("GET", "/api/logout", handler.Logout)
 	mux.Handle("GET", "/api/contacts", handler.Contacts)
 	mux.Handle("POST", "/api/call", handler.MakeCall)
-	mux.Handle("POST", "/api/call/hold", handler.CallHold)
+	// mux.Handle("POST", "/api/call/hold", handler.CallHold)
 	mux.Handle("POST", "/api/call/hangup", handler.CallHangup)
 	mux.Handle("POST", "/api/call/transfer", handler.CallTransfer)
 	mux.Handle("GET", "/api/events", handler.Events)
-	if debug {
-		mux.Handle("GET", "/api/info", handler.ConnectionInfo)
-	}
+	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
 
 	startHTTPServer(mux, config.Host)     // запускаем HTTP сервер
 	monitorSignals(os.Interrupt, os.Kill) // ожидаем сигнала остановки
@@ -140,6 +115,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
+		ErrorLog:     log.StdLog(log.ERROR, "http"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)
@@ -156,8 +132,7 @@ func startHTTPServer(mux http.Handler, host string) {
 			Prompt: autocert.AcceptTOS,
 			HostPolicy: func(_ context.Context, host string) error {
 				if host != httphost {
-					log.WithField("host", host).Error("unsupported https host")
-					return errors.New("acme/autocert: host not configured")
+					return log.Error("unsupported https host", "host", host)
 				}
 				return nil
 			},
@@ -175,11 +150,10 @@ func startHTTPServer(mux http.Handler, host string) {
 	}
 	// запускаем HTTP сервер
 	go func() {
-		log.WithFields(log.Fields{
-			"address": server.Addr,
-			"tls":     canCert,
-			"host":    httphost,
-		}).Info("starting http server")
+		log.Info("starting http server",
+			"address", server.Addr,
+			"tls", canCert,
+			"host", httphost)
 		var err error
 		if canCert {
 			err = server.ListenAndServeTLS("", "")
@@ -187,7 +161,7 @@ func startHTTPServer(mux http.Handler, host string) {
 			err = server.ListenAndServe()
 		}
 		if err != nil {
-			log.WithError(err).Error("http server stopped")
+			log.IfError(err, "http server stopped")
 			os.Exit(2)
 		}
 	}()

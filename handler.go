@@ -44,14 +44,14 @@ func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
 			return
 		}
 		handler.mu.RUnlock()
-		log.WithError(err).Error("mx connection error")
-		log.WithField("delay", time.Minute.String()).Info("reconnecting to mx")
+		log.IfError(err, "mx connection error")
+		log.Info("reconnecting to mx", "delay", time.Minute.String())
 		time.Sleep(time.Minute) // задержка перед переподключением
 		mxs, err = NewMXServer(host, login, password)
 		// подключаемся к серверу MX
 		if err != nil {
 			if _, ok := err.(*mx.LoginError); ok {
-				log.WithError(err).Error("mx connection login error")
+				log.IfError(err, "mx connection login error")
 				return
 			}
 			goto reconnect
@@ -207,16 +207,11 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 	if broker == nil {
 		return c.Error(http.StatusForbidden, "not monitored")
 	}
-	var ctxlog = log.WithFields(log.Fields{
-		"ext":  ext,
-		"type": "sse",
-	})
-	ctxlog.WithField("count", broker.Connected()+1).
-		Debug("sse client connected")
+	var ctxlog = log.New("sse")
+	ctxlog.Debug("connected", "count", broker.Connected()+1)
 	// запускаем отдачу событий
 	broker.ServeHTTP(c.Response, c.Request)
-	ctxlog.WithField("count", broker.Connected()).
-		Debug("sse client disconnected")
+	ctxlog.Debug("disconnected", "count", broker.Connected())
 	return nil
 }
 
@@ -233,22 +228,22 @@ func (h *HTTPHandler) Contacts(c *rest.Context) error {
 	return c.Write(rest.JSON{"contacts": h.mx().Contacts()})
 }
 
-// CallHold подвешивает звонок.
-func (h *HTTPHandler) CallHold(c *rest.Context) error {
-	if _, err := h.tokenExt(c); err != nil {
-		return err
-	}
-	callID, err := strconv.ParseUint(c.Form("callId"), 10, 64)
-	if err != nil {
-		return c.Error(http.StatusBadRequest, "bad call id")
-	}
-	c.AddLogField("callId", callID)
-	var deviceID = c.Form("deviceId")
-	if deviceID == "" {
-		return c.Error(http.StatusBadRequest, "device id required")
-	}
-	return h.mx().CallHold(callID, deviceID)
-}
+// // CallHold подвешивает звонок.
+// func (h *HTTPHandler) CallHold(c *rest.Context) error {
+// 	if _, err := h.tokenExt(c); err != nil {
+// 		return err
+// 	}
+// 	callID, err := strconv.ParseUint(c.Form("callId"), 10, 64)
+// 	if err != nil {
+// 		return c.Error(http.StatusBadRequest, "bad call id")
+// 	}
+// 	c.AddLogField("callId", callID)
+// 	var deviceID = c.Form("deviceId")
+// 	if deviceID == "" {
+// 		return c.Error(http.StatusBadRequest, "device id required")
+// 	}
+// 	return h.mx().CallHold(callID, deviceID)
+// }
 
 // CallHangup сбрасывает звонок.
 func (h *HTTPHandler) CallHangup(c *rest.Context) error {
