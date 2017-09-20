@@ -115,7 +115,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
-		ErrorLog:     log.StdLog(log.ERROR, "http"),
+		ErrorLog:     log.StdLog(log.WARN, "http"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)
