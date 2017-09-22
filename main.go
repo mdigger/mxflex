@@ -38,6 +38,9 @@ func init() {
 
 	// настраиваем вывод лога
 	log.SetLevel(log.Level(logLevel))
+	if strings.Contains(os.Getenv("LOG"), "DEBUG") && log.IsTTY() {
+		log.SetFormat(log.Color)
+	}
 	// выводим информацию о текущей версии
 	var verInfoFields = []interface{}{
 		"name", appName,
@@ -60,7 +63,7 @@ func main() {
 	// загружаем и разбираем конфигурационный файл
 	config, err := LoadConfig(configName)
 	if err != nil {
-		log.IfError(err, "config error")
+		log.IfErr(err, "config error")
 		os.Exit(1)
 	}
 	// подключаемся к серверу MX
@@ -68,7 +71,7 @@ func main() {
 	handler, err := NewHTTPHandler(
 		config.MX.Addr, config.MX.Login, config.MX.Password)
 	if err != nil {
-		log.IfError(err, "mx connection error")
+		log.IfErr(err, "mx connection error")
 		os.Exit(2)
 	}
 	defer handler.Close()
@@ -115,7 +118,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
-		ErrorLog:     log.StdLog(log.WARN, "http"),
+		ErrorLog:     log.StdLogger(log.WARN, "http"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)
@@ -161,7 +164,7 @@ func startHTTPServer(mux http.Handler, host string) {
 			err = server.ListenAndServe()
 		}
 		if err != nil {
-			log.IfError(err, "http server stopped")
+			log.IfErr(err, "http server stopped")
 			os.Exit(2)
 		}
 	}()

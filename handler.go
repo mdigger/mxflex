@@ -44,14 +44,14 @@ func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
 			return
 		}
 		handler.mu.RUnlock()
-		log.IfError(err, "mx connection error")
+		log.IfErr(err, "mx connection error")
 		log.Info("reconnecting to mx", "delay", time.Minute.String())
 		time.Sleep(time.Minute) // задержка перед переподключением
 		mxs, err = NewMXServer(host, login, password)
 		// подключаемся к серверу MX
 		if err != nil {
 			if _, ok := err.(*mx.LoginError); ok {
-				log.IfError(err, "mx connection login error")
+				log.IfErr(err, "mx connection login error")
 				return
 			}
 			goto reconnect

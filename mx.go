@@ -35,7 +35,7 @@ func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetLogger(log.New("MXServer"))
+	conn.SetLogger(log.New("MX Server"))
 	if _, err = conn.Login(mx.Login{
 		UserName: login,
 		Password: password,
@@ -79,7 +79,7 @@ func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetLogger(log.New("MXLogin"))
+	conn.SetLogger(log.New("MX Login: " + login))
 	loginInfo, err := conn.Login(mx.Login{
 		UserName: login,
 		Password: password,
@@ -87,6 +87,7 @@ func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 		Platform: "CRM",
 		Version:  "1.0",
 	})
+	conn.Logout()
 	conn.Close()
 	if err != nil {
 		return nil, err
@@ -218,7 +219,7 @@ func (m *MXServer) monitoring() error {
 				Contact *mx.Contact `xml:"abentry"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.IfError(err, "mx event parse error", "event", resp.Name)
+				log.IfErr(err, "mx event parse error", "event", resp.Name)
 				return nil
 			}
 			m.ab.Store(update.Contact.JID, update.Contact)
@@ -230,7 +231,7 @@ func (m *MXServer) monitoring() error {
 				JID mx.JID `xml:"userId"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.IfError(err, "mx event parse error", "event", resp.Name)
+				log.IfErr(err, "mx event parse error", "event", resp.Name)
 				return nil
 			}
 			m.ab.Delete(update.JID)
@@ -243,14 +244,14 @@ func (m *MXServer) monitoring() error {
 			ID int64 `xml:"monitorCrossRefID"`
 		})
 		if err := resp.Decode(monitor); err != nil {
-			log.IfError(err, "bad monitored event format")
+			log.IfErr(err, "bad monitored event format")
 			return nil
 		}
 		var mData *monitorData
 		if data, ok := m.monitors.Load(monitor.ID); ok {
 			mData = data.(*monitorData)
 		} else {
-			log.Warning("not monitored event")
+			log.Warn("not monitored event")
 			return nil
 		}
 		var event interface{} // данные для отсылки информации о событии
@@ -324,12 +325,12 @@ func (m *MXServer) monitoring() error {
 			})
 		}
 		if err := resp.Decode(event); err != nil {
-			log.IfError(err, "event decode error")
+			log.IfErr(err, "event decode error")
 			return nil
 		}
 		data, err := json.Marshal(event)
 		if err != nil {
-			log.IfError(err, "json encode event error")
+			log.IfErr(err, "json encode event error")
 			return nil
 		}
 		mData.Data(resp.Name, string(data), "") // отсылаем данные
