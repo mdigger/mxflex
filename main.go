@@ -81,7 +81,7 @@ func main() {
 		Headers: map[string]string{
 			"Server": agent,
 		},
-		// Logger: log.WithField("type", "http"),
+		Logger: log.New("HTTP"),
 	}
 	var htmlFile = filepath.Join("html", "index.html")
 	mux.Handle("GET", "/", rest.File(htmlFile))
@@ -118,7 +118,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
-		ErrorLog:     log.StdLogger(log.WARN, "http"),
+		ErrorLog:     log.StdLogger(log.WARN, "HTTP"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)
