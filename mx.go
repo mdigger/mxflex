@@ -324,13 +324,11 @@ func (m *MXServer) monitoring() error {
 				Cause           string `xml:"cause" json:"cause"`
 			})
 		}
-		if err := resp.Decode(event); err != nil {
-			log.IfErr(err, "event decode error")
+		if log.IfErr(resp.Decode(event), "event decode error") != nil {
 			return nil
 		}
 		data, err := json.Marshal(event)
-		if err != nil {
-			log.IfErr(err, "json encode event error")
+		if log.IfErr(err, "json encode event error") != nil {
 			return nil
 		}
 		mData.Data(resp.Name, string(data), "") // отсылаем данные
