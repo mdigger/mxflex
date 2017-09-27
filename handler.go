@@ -44,14 +44,16 @@ func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
 			return
 		}
 		handler.mu.RUnlock()
-		log.IfErr(err, "mx connection error")
+		if err != nil {
+			log.Error("mx connection error", err)
+		}
 		log.Info("reconnecting to mx", "delay", time.Minute.String())
 		time.Sleep(time.Minute) // задержка перед переподключением
 		mxs, err = NewMXServer(host, login, password)
 		// подключаемся к серверу MX
 		if err != nil {
 			if _, ok := err.(*mx.LoginError); ok {
-				log.IfErr(err, "mx connection login error")
+				log.Error("mx connection login error", err)
 				return
 			}
 			goto reconnect
@@ -207,11 +209,11 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 	if broker == nil {
 		return c.Error(http.StatusForbidden, "not monitored")
 	}
-	var ctxlog = log.New("sse")
-	ctxlog.Debug("connected", "count", broker.Connected()+1)
+	var log = log.New("sse")
+	log.Debug("connected", "count", broker.Connected()+1)
 	// запускаем отдачу событий
 	broker.ServeHTTP(c.Response, c.Request)
-	ctxlog.Debug("disconnected", "count", broker.Connected())
+	log.Debug("disconnected", "count", broker.Connected())
 	return nil
 }
 

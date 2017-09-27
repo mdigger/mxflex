@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -39,7 +40,7 @@ func init() {
 	// настраиваем вывод лога
 	log.SetLevel(log.Level(logLevel))
 	if strings.Contains(os.Getenv("LOG"), "DEBUG") && log.IsTTY() {
-		log.SetFormat(log.Color)
+		log.SetFormat(&log.Color{KeyIndent: 8})
 	}
 	// выводим информацию о текущей версии
 	var verInfoFields = []interface{}{
@@ -63,7 +64,7 @@ func main() {
 	// загружаем и разбираем конфигурационный файл
 	config, err := LoadConfig(configName)
 	if err != nil {
-		log.IfErr(err, "config error")
+		log.Error("config error", err)
 		os.Exit(1)
 	}
 	// подключаемся к серверу MX
@@ -71,7 +72,7 @@ func main() {
 	handler, err := NewHTTPHandler(
 		config.MX.Addr, config.MX.Login, config.MX.Password)
 	if err != nil {
-		log.IfErr(err, "mx connection error")
+		log.Error("mx connection error", err)
 		os.Exit(2)
 	}
 	defer handler.Close()
@@ -118,7 +119,7 @@ func startHTTPServer(mux http.Handler, host string) {
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Minute * 5,
-		ErrorLog:     log.StdLogger(log.WARN, "HTTP"),
+		ErrorLog:     log.StdLog(log.WARN, "HTTP"),
 	}
 	// анализируем порт
 	var httphost, port, err = net.SplitHostPort(host)
@@ -135,7 +136,8 @@ func startHTTPServer(mux http.Handler, host string) {
 			Prompt: autocert.AcceptTOS,
 			HostPolicy: func(_ context.Context, host string) error {
 				if host != httphost {
-					return log.Error("unsupported https host", "host", host)
+					log.Error("unsupported https host", "host", host)
+					return fmt.Errorf("unsupported https host %s", host)
 				}
 				return nil
 			},
@@ -164,7 +166,7 @@ func startHTTPServer(mux http.Handler, host string) {
 			err = server.ListenAndServe()
 		}
 		if err != nil {
-			log.IfErr(err, "http server stopped")
+			log.Error("http server stopped", err)
 			os.Exit(2)
 		}
 	}()

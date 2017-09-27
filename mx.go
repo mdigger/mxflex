@@ -219,7 +219,7 @@ func (m *MXServer) monitoring() error {
 				Contact *mx.Contact `xml:"abentry"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.IfErr(err, "mx event parse error", "event", resp.Name)
+				log.Error("mx event parse error", err, "event", resp.Name)
 				return nil
 			}
 			m.ab.Store(update.Contact.JID, update.Contact)
@@ -231,7 +231,7 @@ func (m *MXServer) monitoring() error {
 				JID mx.JID `xml:"userId"`
 			})
 			if err := resp.Decode(update); err != nil {
-				log.IfErr(err, "mx event parse error", "event", resp.Name)
+				log.Error("mx event parse error", err, "event", resp.Name)
 				return nil
 			}
 			m.ab.Delete(update.JID)
@@ -244,7 +244,7 @@ func (m *MXServer) monitoring() error {
 			ID int64 `xml:"monitorCrossRefID"`
 		})
 		if err := resp.Decode(monitor); err != nil {
-			log.IfErr(err, "bad monitored event format")
+			log.Error("bad monitored event format", err)
 			return nil
 		}
 		var mData *monitorData
@@ -324,11 +324,13 @@ func (m *MXServer) monitoring() error {
 				Cause           string `xml:"cause" json:"cause"`
 			})
 		}
-		if log.IfErr(resp.Decode(event), "event decode error") != nil {
+		if err := resp.Decode(event); err != nil {
+			log.Error("event decode error", err)
 			return nil
 		}
 		data, err := json.Marshal(event)
-		if log.IfErr(err, "json encode event error") != nil {
+		if err != nil {
+			log.Error("json encode event error", err)
 			return nil
 		}
 		mData.Data(resp.Name, string(data), "") // отсылаем данные
