@@ -5,20 +5,11 @@ import (
 	"encoding/xml"
 	"sort"
 	"sync"
-	"time"
 
-	"github.com/mdigger/jwt"
 	"github.com/mdigger/log"
 	"github.com/mdigger/mx"
 	"github.com/mdigger/sse"
 )
-
-// jwtConfig описывает конфигурацию для создания токенов авторизации
-var jwtConfig = &jwt.Config{
-	Created: true,                // добавляем дату создания
-	Expires: time.Hour,           // время жизни токена
-	Key:     jwt.NewHS256Key(64), // ключ для подписи
-}
 
 // MXServer позволяет отслеживать информацию о звонках на сервер MX.
 type MXServer struct {
@@ -35,7 +26,7 @@ func NewMXServer(mxHost, login, password string) (*MXServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetLogger(log.New("MX Server"))
+	conn.SetLogger(log.New("mx"))
 	if _, err = conn.Login(mx.Login{
 		UserName: login,
 		Password: password,
@@ -79,7 +70,7 @@ func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetLogger(log.New("MX Login: " + login))
+	conn.SetLogger(log.New("mx-login: " + login))
 	loginInfo, err := conn.Login(mx.Login{
 		UserName: login,
 		Password: password,

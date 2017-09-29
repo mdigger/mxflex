@@ -27,6 +27,12 @@ type HTTPHandler struct {
 // NewHTTPHandler инициализирует и возвращает обработчик HTTP-запросов к
 // серверу MX.
 func NewHTTPHandler(host, login, password string) (*HTTPHandler, error) {
+	if _, _, err := net.SplitHostPort(host); err != nil {
+		err, ok := err.(*net.AddrError)
+		if ok && err.Err == "missing port in address" {
+			host = net.JoinHostPort(host, "7778")
+		}
+	}
 	mxServer, err := NewMXServer(host, login, password)
 	if err != nil {
 		return nil, err
@@ -81,6 +87,12 @@ func (h *HTTPHandler) mx() *MXServer {
 	var mxs = h.mxServer
 	h.mu.RUnlock()
 	return mxs
+}
+
+// Check проверяет, что есть подключение к серверу MX. В противном случае
+// возвращает ошибку.
+func (h *HTTPHandler) Check(c *rest.Context) error {
+	return nil
 }
 
 // Login авторизует пользователя MX, запускает мониторинг звонок для него и

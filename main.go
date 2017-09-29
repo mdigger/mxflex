@@ -1,173 +1,113 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"flag"
-	"fmt"
-	"net"
+	"html/template"
 	"net/http"
 	"os"
-	"os/signal"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mdigger/jwt"
 	"github.com/mdigger/log"
-	"github.com/mdigger/rest"
-	"golang.org/x/crypto/acme/autocert"
 )
 
 // информация о сервисе и версия
 var (
 	appName = "MXFlex" // название сервиса
-	version = "1.9"    // версия
+	version = "2.0"    // версия
 	date    = ""       // дата сборки
 	git     = ""       // версия git
 
-	agent      = appName + "/" + version            // имя агента и сервера
-	configName = strings.ToLower(appName) + ".toml" // имя файла с хранилищем токенов
+	agent         = appName + "/" + version             // имя агента и сервера
+	lowerAppName  = strings.ToLower(appName)            // используется как имя
+	configName    = lowerAppName + ".json"              // конфигурационный файл
+	adminTemplate = lowerAppName + ".html"              // шаблон административного интерфейса
+	adminHost     = ":12880"                            // адрес административного сервера
+	logPath       = "/var/log/" + lowerAppName + ".log" // путь к файлам с логами
+	manifestName  = "manifest.zip"
+
+	// jwtConfig описывает конфигурацию для создания токенов авторизации
+	jwtConfig = &jwt.Config{
+		Created: true,                // добавляем дату создания
+		Expires: time.Hour,           // время жизни токена
+		Key:     jwt.NewHS256Key(64), // ключ для подписи
+	}
 )
 
 func init() {
-	// инициализируем разбор параметров запуска сервиса
-	flag.StringVar(&configName, "config", configName, "configuration `filename`")
-	var logLevel = int(log.INFO)
-	flag.IntVar(&logLevel, "log", logLevel, "log `level`")
-	flag.Parse()
-
-	// настраиваем вывод лога
-	log.SetLevel(log.Level(logLevel))
-	if strings.Contains(os.Getenv("LOG"), "DEBUG") && log.IsTTY() {
-		log.SetFormat(&log.Color{KeyIndent: 8})
-	}
+	// log.SetFormat(log.Color{KeyIndent: 12})
 	// выводим информацию о текущей версии
-	var verInfoFields = []interface{}{
-		"name", appName,
-		"version", version,
+	var verInfoFields = []log.Field{
+		log.Field{Name: "name", Value: appName},
+		log.Field{Name: "version", Value: version},
 	}
 	if date != "" {
-		verInfoFields = append(verInfoFields, "builded", date)
+		verInfoFields = append(verInfoFields, log.Field{Name: "builded", Value: date})
 	}
 	if git != "" {
-		verInfoFields = append(verInfoFields, "git", git)
+		verInfoFields = append(verInfoFields, log.Field{Name: "git", Value: git})
 		agent += " (" + git + ")"
 	}
-	log.Info("service info", verInfoFields...)
+	log.Info("service info", verInfoFields)
+
+	flag.StringVar(&configName, "config", configName, "config `filename`")
+	flag.StringVar(&adminHost, "admin", adminHost, "admin http server `host`")
+	flag.StringVar(&adminTemplate, "template", adminTemplate, "admin template `filename`")
+	flag.StringVar(&logPath, "log", logPath, "`path` to log files")
+	flag.StringVar(&manifestName, "manifest", manifestName, "`path` to manifest file")
+	flag.DurationVar(&jwtConfig.Expires, "token", jwtConfig.Expires, "jwt token `ttl`")
+	flag.Parse()
 }
 
 func main() {
-	// выводим в лог ключ для подписи токенов
-	log.Debug("jwt sign key", "key",
-		base64.RawURLEncoding.EncodeToString(jwtConfig.Key.([]byte)))
-	// загружаем и разбираем конфигурационный файл
 	config, err := LoadConfig(configName)
 	if err != nil {
 		log.Error("config error", err)
-		os.Exit(1)
-	}
-	// подключаемся к серверу MX
-	log.Info("connecting to mx", "host", config.MX.Addr, "login", config.MX.Login)
-	handler, err := NewHTTPHandler(
-		config.MX.Addr, config.MX.Login, config.MX.Password)
-	if err != nil {
-		log.Error("mx connection error", err)
 		os.Exit(2)
 	}
-	defer handler.Close()
-
-	// инициализируем обработку HTTP запросов
-	var mux = &rest.ServeMux{
-		Headers: map[string]string{
-			"Server": agent,
-		},
-		Logger: log.New("HTTP"),
+	tmpl, err := template.ParseFiles(adminTemplate)
+	if err != nil {
+		log.Error("admin template error", err)
+		os.Exit(2)
 	}
-	var htmlFile = filepath.Join("html", "index.html")
-	mux.Handle("GET", "/", rest.File(htmlFile))
-	mux.Handle("GET", "/"+filepath.Base(htmlFile), rest.Redirect("/"))
-	mux.Handle("GET", "/*file", rest.Files(filepath.Dir(htmlFile)))
+	// выводим в лог ключ для подписи токенов
+	log.Debug("jwt sign key", "key",
+		base64.RawURLEncoding.EncodeToString(jwtConfig.Key.([]byte)))
 
-	mux.Handle("POST", "/api/login", handler.Login)
-	mux.Handle("GET", "/api/logout", handler.Logout)
-	mux.Handle("GET", "/api/contacts", handler.Contacts)
-	mux.Handle("POST", "/api/call", handler.MakeCall)
-	// mux.Handle("POST", "/api/call/hold", handler.CallHold)
-	mux.Handle("POST", "/api/call/hangup", handler.CallHangup)
-	mux.Handle("POST", "/api/call/transfer", handler.CallTransfer)
-	mux.Handle("GET", "/api/events", handler.Events)
-	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
-
-	startHTTPServer(mux, config.Host)     // запускаем HTTP сервер
-	monitorSignals(os.Interrupt, os.Kill) // ожидаем сигнала остановки
-}
-
-// monitorSignals запускает мониторинг сигналов и возвращает значение, когда
-// получает сигнал. В качестве параметров передается список сигналов, которые
-// нужно отслеживать.
-func monitorSignals(signals ...os.Signal) os.Signal {
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, signals...)
-	return <-signalChan
-}
-
-// StartHTTPServer запускает HTTP сервер.
-func startHTTPServer(mux http.Handler, host string) {
-	// инициализируем HTTP сервер
-	var server = &http.Server{
-		Handler:      mux,
-		ReadTimeout:  time.Second * 10,
-		WriteTimeout: time.Minute * 5,
-		ErrorLog:     log.StdLog(log.WARN, "HTTP"),
+	// запускаем прокси
+	proxy, err := NewProxy(config)
+	if err != nil {
+		config.err = err
 	}
-	// анализируем порт
-	var httphost, port, err = net.SplitHostPort(host)
-	if err, ok := err.(*net.AddrError); ok && err.Err == "missing port in address" {
-		httphost = err.Addr
+
+	// запускаем административный веб сервер
+	admin := &Admin{
+		config: config,
+		tmpl:   tmpl,
+		proxy:  proxy,
+		log:    log.New("admin"),
 	}
-	var canCert = httphost != "localhost" &&
-		!strings.HasSuffix(httphost, ".local") &&
-		net.ParseIP(httphost) == nil && httphost != "" &&
-		(port == "443" || port == "https" || port == "")
-	// добавляем автоматическую поддержку TLS сертификатов для сервиса
-	if canCert {
-		manager := autocert.Manager{
-			Prompt: autocert.AcceptTOS,
-			HostPolicy: func(_ context.Context, host string) error {
-				if host != httphost {
-					log.Error("unsupported https host", "host", host)
-					return fmt.Errorf("unsupported https host %s", host)
-				}
-				return nil
-			},
-			Email: "dmitrys@xyzrd.com",
-			Cache: autocert.DirCache("letsEncrypt.cache"),
-		}
-		server.TLSConfig = &tls.Config{
-			GetCertificate: manager.GetCertificate,
-		}
-		server.Addr = ":https"
-	} else if port == "" {
-		server.Addr = net.JoinHostPort(httphost, "http")
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("/", admin.Config)
+	adminMux.HandleFunc("/manifest.zip", admin.Manifest)
+	// отображаем либо каталог с логами, либо содержимое файла лога
+	if fi, err := os.Stat(logPath); err != nil || fi.IsDir() {
+		adminMux.Handle("/log/", http.StripPrefix(
+			"/log/", http.FileServer(http.Dir(logPath))))
 	} else {
-		server.Addr = net.JoinHostPort(httphost, port)
+		adminMux.HandleFunc("/log/", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, logPath)
+		})
 	}
-	// запускаем HTTP сервер
-	go func() {
-		log.Info("starting http server",
-			"address", server.Addr,
-			"tls", canCert,
-			"host", httphost)
-		var err error
-		if canCert {
-			err = server.ListenAndServeTLS("", "")
-		} else {
-			err = server.ListenAndServe()
-		}
-		if err != nil {
-			log.Error("http server stopped", err)
-			os.Exit(2)
-		}
-	}()
+	adminServer := http.Server{
+		Addr:     adminHost,
+		Handler:  admin.Authorization(adminMux), // проверяем авторизацию
+		ErrorLog: admin.log.StdLog(log.ERROR),
+	}
+	admin.log.Info("service started", "addr", adminServer.Addr, "https", false)
+	err = adminServer.ListenAndServe()
+	adminServer.Close()
+	admin.log.Info("service stopped", err)
 }

@@ -22,14 +22,15 @@ info:
 
 package: info clean darwin linux
 	cp README.md ./build
-	cp mxflex.toml ./build
+	cp LICENSE ./build
+	cp mxflex.html ./build
 	cd ./build && zip $(appname)-$(VERSION).zip *.*
 
 build:
 	go build -race -o $(appname) $(FLAGS)
 
 debug: build
-	LOG=DEBUG ./$(appname) -log=-128
+	LOG=COLOR ./$(appname)
 
 clean:
 	rm -rf build/

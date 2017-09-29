@@ -1,0 +1,39 @@
+<html>
+<title>{{.Version}}</title>
+<form method="POST">
+<fieldset><legend>Admin</legend>
+<input name="admin.login" value="{{.Admin.Login}}" placeholder="admin login"><br>
+<input name="admin.password" type="password" placeholder="admin password"><br>
+</fieldset>
+<input type="submit">
+</form>
+<!-- 
+    Я разделил на две формы, но они отсылаются в одно и тоже место и могут обрабатываться 
+    одновременно. Поэтому их можно объединить и в одну.
+-->
+<form method="POST">
+<fieldset><legend><a href="{{.ServerURL}}" target="crm">Server</a>{{if not .Error}} <a href="/manifest.zip">manifest</a>{{end}}</legend>
+<input name="server.host" value="{{.Server.Host}}" placeholder="server host"><br>
+<select name="server.log">
+<option value="ALL"{{if lt .Server.LogLevel 0}} selected{{end}}>All</option>
+<option value="INFO"{{if eq .Server.LogLevel 0}} selected{{end}}>Info</option>
+<option value="ERROR"{{if gt .Server.LogLevel 0}} selected{{end}}>Error</option>
+</select>
+</fieldset>
+<fieldset><legend>MX</legend>
+<input name="mx.host" value="{{.MX.Host}}" placeholder="mx host"><br>
+<input id="mx.login" name="mx.login" value="{{.MX.Login}}" placeholder="mx server login"><br>
+<input id="mx.password" name="mx.password" type="password" placeholder="mx password"><br>
+</fieldset>
+{{if .Error}}<div>{{.}}</div>{{end}}
+<input type="submit">
+</form>
+<!-- 
+    Не обязательно использовать фреймы: это может быть просто ссылка на открытие другого окна.
+    Проверка существования такого каталога с логами тоже не обязательна.
+-->
+{{- if .LogExists}}
+<fieldset><legend>Log</legend>
+<iframe src="/log/" width="100%" height="400" frameborder="0"></iframe></fieldset>
+{{end -}}
+</html>
