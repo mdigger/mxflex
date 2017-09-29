@@ -24,7 +24,7 @@ package: info clean darwin linux
 	cp README.md ./build
 	cp LICENSE ./build
 	cp mxflex.html ./build
-	cd ./build && zip $(appname)-$(VERSION).zip *.*
+	cd ./build && zip $(appname)-$(VERSION).zip LICENSE *.*
 
 build:
 	go build -race -o $(appname) $(FLAGS)
