@@ -20,13 +20,14 @@ var (
 	date    = ""       // дата сборки
 	git     = ""       // версия git
 
-	agent         = appName + "/" + version             // имя агента и сервера
-	lowerAppName  = strings.ToLower(appName)            // используется как имя
-	configName    = lowerAppName + ".json"              // конфигурационный файл
-	adminTemplate = lowerAppName + ".html"              // шаблон административного интерфейса
-	adminHost     = ":12880"                            // адрес административного сервера
-	logPath       = "/var/log/" + lowerAppName + ".log" // путь к файлам с логами
-	manifestName  = "manifest.zip"
+	agent          = appName + "/" + version             // имя агента и сервера
+	lowerAppName   = strings.ToLower(appName)            // используется как имя
+	configName     = lowerAppName + ".json"              // конфигурационный файл
+	adminTemplate  = lowerAppName + ".html"              // шаблон административного интерфейса
+	adminHost      = ":12880"                            // адрес административного сервера
+	logPath        = "/var/log/" + lowerAppName + ".log" // путь к файлам с логами
+	manifestName   = "manifest.zip"
+	srcManifestURL = "%host" // строку, которую надо заменить в манифесте на хост сервиса
 
 	// jwtConfig описывает конфигурацию для создания токенов авторизации
 	jwtConfig = &jwt.Config{

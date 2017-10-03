@@ -187,8 +187,6 @@ func (a *Admin) Authorization(h http.Handler) http.HandlerFunc {
 	}
 }
 
-var srcManifestURL = []byte("https://mxflex.connector73.net")
-
 // Manifest отдает файл с манифестом.
 func (a *Admin) Manifest(w http.ResponseWriter, r *http.Request) {
 	zr, err := zip.OpenReader(manifestName)
@@ -223,7 +221,7 @@ func (a *Admin) Manifest(w http.ResponseWriter, r *http.Request) {
 				rc.Close()
 				return
 			}
-			data = bytes.Replace(data, srcManifestURL, []byte(a.config.ServerURL()), -1)
+			data = bytes.Replace(data, []byte(srcManifestURL), []byte(a.config.ServerURL()), -1)
 			if _, err = zf.Write(data); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				a.log.Error("manifest write error", err)

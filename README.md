@@ -171,27 +171,6 @@ Server: MXFlex/0.8
 {
     "contacts": [
         {
-            "jid": "43884852633771555",
-            "status": "LoggedOut",
-            "firstName": "SMS",
-            "lastName": "Gateway C73",
-            "ext": "3010"
-        },
-        {
-            "jid": "43884851338921185",
-            "status": "LoggedOut",
-            "firstName": "mxflex",
-            "lastName": "mxflex",
-            "ext": "3042"
-        },
-        {
-            "jid": "43884852654574210",
-            "status": "LoggedOut",
-            "firstName": "Ilia",
-            "lastName": "Test",
-            "ext": "3043"
-        },
-        {
             "jid": "43884851428118509",
             "status": "LoggedOut",
             "firstName": "Peter",
@@ -201,16 +180,6 @@ Server: MXFlex/0.8
             "cellPhone": "+1-512-555-0136",
             "email": "peterh@xyzrd.com",
             "did": "15125550136"
-        },
-        {
-            "jid": "43884850646482261",
-            "status": "LoggedOut",
-            "firstName": "Mike",
-            "lastName": "Flynn",
-            "ext": "3055",
-            "homePhone": "+1-202-555-0104",
-            "cellPhone": "+1-512-555-0136",
-            "email": "mikef@xyzrd.com"
         },
         {
             "jid": "43884850557879186",
@@ -233,76 +202,7 @@ Server: MXFlex/0.8
             "lastName": "Three",
             "ext": "3082"
         },
-        {
-            "jid": "43884852535898307",
-            "status": "LoggedOut",
-            "firstName": "dstest1",
-            "lastName": "dstest1",
-            "ext": "3091"
-        },
-        {
-            "jid": "43884850939404214",
-            "status": "LoggedOut",
-            "firstName": "dstest2",
-            "lastName": "dstest2",
-            "ext": "3092",
-            "cellPhone": "16693507465",
-            "did": "16693507465"
-        },
-        {
-            "jid": "43884850647480796",
-            "status": "LoggedOut",
-            "firstName": "Test",
-            "lastName": "Admin",
-            "ext": "3093"
-        },
-        {
-            "jid": "43884852355777349",
-            "status": "LoggedOut",
-            "firstName": "Zultys",
-            "lastName": "Test",
-            "ext": "3094"
-        },
-        {
-            "jid": "43884851147406145",
-            "status": "Available",
-            "firstName": "Dmitry",
-            "lastName": "Sedykh",
-            "ext": "3095",
-            "cellPhone": "+79031744445",
-            "email": "dmitrys@xyzrd.com"
-        },
-        {
-            "jid": "43884851851343044",
-            "status": "LoggedOut",
-            "firstName": "Sergey",
-            "lastName": "Kananykhin",
-            "ext": "3096"
-        },
-        {
-            "jid": "43884851514905017",
-            "status": "LoggedOut",
-            "firstName": "Test",
-            "lastName": "Zultys",
-            "ext": "3097"
-        },
-        {
-            "jid": "43884851324615074",
-            "status": "LoggedOut",
-            "firstName": "John",
-            "lastName": "Smith",
-            "ext": "3098",
-            "cellPhone": "12035160992",
-            "did": "12035160992"
-        },
-        {
-            "jid": "43884852031096113",
-            "status": "Available",
-            "firstName": "Maxim",
-            "lastName": "Donchenko",
-            "ext": "3099",
-            "cellPhone": "+420720961083"
-        }
+        ...
     ]
 }
 ```
@@ -344,27 +244,6 @@ Content-Length: 107
     }
 }
 ```
-
-<!-- ## Call Hold
-
-```http
-POST /api/call/hold HTTP/1.1
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MDU0MzQ5NjIsImV4dCI6IjMwOTUiLCJpYXQiOjE1MDU0MzEzNTIsIm14IjoiNjMwMjIiLCJzdWIiOjQzODg0ODUxMTQ3NDA2MTQ1fQ.EtgCdPAoyCr3e8S_IPOkN3y09Q5AJ2mBsPaqcxbsD3c
-Content-Type: application/x-www-form-urlencoded; charset=utf-8
-Host: localhost:8080
-Content-Length: 23
-
-callId=43&deviceId=3095
-```
-
-В качестве параметров запроса передаются идентификатор звонка и устройства:
-
-- `callId`
-- `deviceId`
-
-В случае успешного действия ответ не возвращается: нужно следить за событиями -- ответ будет там.
-
-Повторный вызов функции должен снять звонок с ожидания. -->
 
 ## Call Transfer
 
@@ -422,3 +301,5 @@ callId=43&deviceId=3095
 ## Настройки
 
 Все настройки задаются через параметры приложения. Остальное настраивается через административный веб интерфейс.
+
+При генерации манифеста используется исходный архив, в котором в файле `manifest.json` строка `%host` заменяется на хост сервиса MXFlex. Все остальное остается без изменения.
