@@ -213,7 +213,7 @@ func (a *Admin) Manifest(w http.ResponseWriter, r *http.Request) {
 			rc.Close()
 			return
 		}
-		if f.Name == "zat/manifest.json" {
+		if f.Name == "manifest.json" {
 			data, err := ioutil.ReadAll(rc)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
