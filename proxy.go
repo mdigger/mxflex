@@ -74,6 +74,8 @@ func NewProxy(config *Config) (*Proxy, error) {
 		server.TLSConfig = &tls.Config{
 			GetCertificate: manager.GetCertificate,
 		}
+		// поддержка получения сертификата Let's Encrypt
+		go http.ListenAndServe(":http", manager.HTTPHandler(nil))
 	} else {
 		server.Addr = ":http"
 		if hostURL, err := url.Parse(host); err == nil {
