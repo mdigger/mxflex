@@ -26,6 +26,7 @@ type Config struct {
 		Login    string
 		Password []byte
 	}
+	Params   map[string]string
 	filename string
 	err      error
 	mu       sync.RWMutex
@@ -67,6 +68,9 @@ func LoadConfig(filename string) (*Config, error) {
 		log.SetLevel(log.WARN)
 	} else {
 		log.SetLevel(log.INFO)
+	}
+	if len(config.Params) == 0 {
+		config.Params = map[string]string{"phoneCountry": "EE"}
 	}
 	config.filename = filename
 	return config, nil

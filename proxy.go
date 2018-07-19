@@ -53,6 +53,13 @@ func NewProxy(config *Config) (*Proxy, error) {
 	mux.Handle("POST", "/api/call/transfer", handler.CallTransfer)
 	mux.Handle("GET", "/api/events", handler.Events)
 	mux.Handle("GET", "/api/info", handler.ConnectionInfo)
+	// дополнительные данные
+	mux.Handle("GET", "/rules", func(c *rest.Context) error {
+		config.mu.RLock()
+		defer config.mu.RUnlock()
+		return c.Write(rest.JSON{"params": config.Params})
+	})
+
 	// инициализируем HTTP сервер
 	var server = &http.Server{
 		Handler:     mux,

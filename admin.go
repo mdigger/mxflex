@@ -117,7 +117,10 @@ func (a *Admin) Config(w http.ResponseWriter, r *http.Request) {
 				a.config.MX.Password = []byte(value)
 				mxChanged = true
 			default:
-				continue
+				if !strings.HasPrefix(name, "params.") {
+					continue
+				}
+				a.config.Params[strings.TrimPrefix(name, "params.")] = value
 			}
 			changed = true
 		}

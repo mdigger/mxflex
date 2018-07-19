@@ -25,6 +25,9 @@
 <input id="mx.login" name="mx.login" value="{{.MX.Login}}" placeholder="mx server login"><br>
 <input id="mx.password" name="mx.password" type="password" placeholder="mx password"><br>
 </fieldset>
+<fieldset><legend>Rules</legend>
+<input name="params.phoneCountry" value="{{.Params.phoneCountry}}" placeholder="phone country"><br>
+</fieldset>
 {{if .Error}}<div>{{.}}</div>{{end}}
 <input type="submit">
 </form>
