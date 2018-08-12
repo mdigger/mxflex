@@ -5,3 +5,4 @@ debug
 .vscode/
 *.paw
 *.yaml
+.DS_Store
