@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"sort"
 	"sync"
@@ -89,7 +88,7 @@ func (m *MXServer) Login(login, password string) (*mx.Info, error) {
 // monitorData описывает ассоциированные с монитором данные.
 type monitorData struct {
 	Extension   string // внутренний номер пользователя
-	*sse.Broker        // SSE-брокер для мониторинга событий
+	*sse.Server        // SSE-брокер для мониторинга событий
 }
 
 // MonitorStart запускает пользовательский монитор.
@@ -124,7 +123,7 @@ func (m *MXServer) MonitorStart(ext string) error {
 	// номером пользователя и SSE-брокером.
 	m.monitors.Store(monitor.ID, &monitorData{
 		Extension: ext,
-		Broker:    sse.New(),
+		Server:    new(sse.Server),
 	})
 	return nil
 }
@@ -319,12 +318,7 @@ func (m *MXServer) monitoring() error {
 			log.Error("event decode error", err)
 			return nil
 		}
-		data, err := json.Marshal(event)
-		if err != nil {
-			log.Error("json encode event error", err)
-			return nil
-		}
-		mData.Data(resp.Name, string(data), "") // отсылаем данные
+		mData.Event("", resp.Name, event) // отсылаем данные
 		log.Info("monitoring event",
 			"event", resp.Name,
 			"ext", mData.Extension,

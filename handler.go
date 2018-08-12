@@ -206,14 +206,14 @@ func (h *HTTPHandler) Events(c *rest.Context) error {
 	if err != nil {
 		return err
 	}
-	if mediatype, _, _ := mime.ParseMediaType(c.Header("Accept")); mediatype != sse.Mimetype {
+	if mediatype, _, _ := mime.ParseMediaType(c.Header("Accept")); mediatype != "text/event-source" {
 		return c.Error(http.StatusNotAcceptable, "only sse support")
 	}
-	var broker *sse.Broker
+	var broker *sse.Server
 	h.mx().monitors.Range(func(_, data interface{}) bool {
 		var md = data.(*monitorData)
 		if md.Extension == ext {
-			broker = md.Broker
+			broker = md.Server
 			return false
 		}
 		return true
