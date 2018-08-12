@@ -299,7 +299,7 @@ Content-Length: 56
 
 {
     "params": {
-        "phoneCountry":  "EE"
+        "phoneCountry": "EE"
     }
 }
 ```
