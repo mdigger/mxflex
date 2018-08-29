@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"mime"
 	"net"
@@ -155,13 +156,15 @@ func (h *HTTPHandler) tokenExt(c *rest.Context) (string, error) {
 		}
 		token = strings.TrimPrefix(auth, "Bearer ")
 	}
-	if err := jwt.Verify(token, jwtConfig.Key); err != nil {
+	// проверяем токен и получаем его содержимое
+	data, err := jwt.Verify(token, jwtConfig.Key)
+	if err != nil {
 		return "", rest.NewError(http.StatusForbidden, err.Error())
 	}
 	var t = new(struct {
 		Ext string `json:"ext"`
 	})
-	if err := jwt.Decode(token, t); err != nil {
+	if err := json.Unmarshal(data, t); err != nil {
 		return "", rest.NewError(http.StatusForbidden, err.Error())
 	}
 	c.AddLogField("ext", t.Ext)
